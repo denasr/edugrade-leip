@@ -28,10 +28,10 @@ export default async function PanelDocente() {
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
       <div className="text-center">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="font-title text-2xl text-verde-bosque">
           Panel del docente
         </h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-sm text-ink/70">
           Bienvenido, {perfil.nombre_completo}.
         </p>
       </div>
@@ -39,12 +39,10 @@ export default async function PanelDocente() {
       <FormularioCurso />
 
       <section className="w-full max-w-sm">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Mis cursos
-        </h2>
+        <h2 className="font-title text-xl text-verde-bosque">Mis cursos</h2>
 
         {!cursos || cursos.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-4 text-sm text-ink/60">
             Todavía no has creado ningún curso.
           </p>
         ) : (
@@ -52,20 +50,16 @@ export default async function PanelDocente() {
             {cursos.map((curso) => (
               <li
                 key={curso.id}
-                className="rounded-lg border border-zinc-200 p-4 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+                className="card p-4 transition-shadow hover:shadow-md"
               >
                 <Link href={`/docente/cursos/${curso.id}`}>
-                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                    {curso.nombre}
-                  </p>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <p className="font-medium text-ink">{curso.nombre}</p>
+                  <p className="text-sm text-ink/60">
                     {curso.grupo} · {curso.periodo}
                   </p>
                   <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="rounded bg-zinc-100 px-2 py-1 font-mono text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50">
-                      {curso.clave_acceso}
-                    </span>
-                    <span className="text-zinc-600 dark:text-zinc-400">
+                    <span className="clave-acceso">{curso.clave_acceso}</span>
+                    <span className="text-ink/60">
                       {curso.inscripciones[0]?.count ?? 0} inscritos
                     </span>
                   </div>

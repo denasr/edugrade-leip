@@ -162,27 +162,22 @@ export default async function DetalleCursoEstudiante({
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
       <div className="w-full max-w-sm text-center">
-        <Link
-          href="/estudiante"
-          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-        >
+        <Link href="/estudiante" className="link-muted">
           ← Mis cursos
         </Link>
-        <h1 className="mt-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="mt-2 font-title text-2xl text-verde-bosque">
           {curso.nombre}
         </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-ink/70">
           {curso.grupo} · {curso.periodo}
         </p>
       </div>
 
       <section className="w-full max-w-sm">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Tareas
-        </h2>
+        <h2 className="font-title text-xl text-verde-bosque">Tareas</h2>
 
         {actividadesConEnlace.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-4 text-sm text-ink/60">
             Todavía no hay tareas publicadas en este curso.
           </p>
         ) : (
@@ -194,32 +189,27 @@ export default async function DetalleCursoEstudiante({
                 actividad.entrega?.archivos_entrega[0] ?? null;
 
               return (
-                <li
-                  key={actividad.id}
-                  className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
-                >
+                <li key={actividad.id} className="card p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                      {actividad.titulo}
-                    </p>
+                    <p className="font-medium text-ink">{actividad.titulo}</p>
                     <span
-                      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
+                      className={
                         estado === "ABIERTA"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      }`}
+                          ? "badge-abierta"
+                          : "badge-cerrada"
+                      }
                     >
                       {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
                     </span>
                   </div>
 
                   {actividad.instrucciones && (
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-1 text-sm text-ink/70">
                       {actividad.instrucciones}
                     </p>
                   )}
 
-                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                  <p className="mt-2 text-xs text-ink/50">
                     {actividad.fecha_apertura
                       ? `Abre ${new Date(
                           actividad.fecha_apertura
@@ -234,43 +224,43 @@ export default async function DetalleCursoEstudiante({
                   {actividad.enlaceDescarga && (
                     <a
                       href={actividad.enlaceDescarga}
-                      className="mt-2 inline-block text-sm font-medium text-zinc-900 hover:underline dark:text-zinc-50"
+                      className="mt-2 inline-block text-sm font-medium text-verde-bosque hover:underline"
                     >
                       Descargar {actividad.nombreArchivo}
                     </a>
                   )}
 
                   {actividad.entrega ? (
-                    <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
-                      <p className="text-zinc-600 dark:text-zinc-400">
+                    <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
+                      <p className="text-ink/70">
                         Entregaste: {archivoEntregado?.nombre_archivo}
                       </p>
                       {actividad.entrega.comentario_estudiante && (
-                        <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                        <p className="mt-1 text-ink/70">
                           Tu comentario: {actividad.entrega.comentario_estudiante}
                         </p>
                       )}
                       {evaluacion ? (
                         <div className="mt-2">
-                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                          <p className="font-medium text-ink">
                             Calificación: {evaluacion.calificacion_final}/10
                           </p>
                           {evaluacion.comentarios && (
-                            <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                            <p className="mt-1 text-ink/70">
                               {evaluacion.comentarios}
                             </p>
                           )}
                         </div>
                       ) : (
-                        <p className="mt-2 text-zinc-500 dark:text-zinc-500">
-                          Pendiente de calificar.
-                        </p>
+                        <span className="badge-pendiente mt-2">
+                          Pendiente de calificar
+                        </span>
                       )}
                     </div>
                   ) : estado === "ABIERTA" ? (
                     <FormularioEntrega actividadId={actividad.id} cursoId={id} />
                   ) : (
-                    <p className="mt-3 border-t border-zinc-200 pt-3 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-500">
+                    <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/50">
                       No se puede entregar. {motivoCierre(actividad)}
                     </p>
                   )}
@@ -282,12 +272,10 @@ export default async function DetalleCursoEstudiante({
       </section>
 
       <section className="w-full max-w-sm">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Exámenes
-        </h2>
+        <h2 className="font-title text-xl text-verde-bosque">Exámenes</h2>
 
         {examenesConPreguntas.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-4 text-sm text-ink/60">
             Todavía no hay exámenes publicados en este curso.
           </p>
         ) : (
@@ -297,32 +285,27 @@ export default async function DetalleCursoEstudiante({
               const evaluacion = examen.entrega?.evaluaciones ?? null;
 
               return (
-                <li
-                  key={examen.id}
-                  className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
-                >
+                <li key={examen.id} className="card p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                      {examen.titulo}
-                    </p>
+                    <p className="font-medium text-ink">{examen.titulo}</p>
                     <span
-                      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
+                      className={
                         estado === "ABIERTA"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      }`}
+                          ? "badge-abierta"
+                          : "badge-cerrada"
+                      }
                     >
                       {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
                     </span>
                   </div>
 
                   {examen.instrucciones && (
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-1 text-sm text-ink/70">
                       {examen.instrucciones}
                     </p>
                   )}
 
-                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                  <p className="mt-2 text-xs text-ink/50">
                     {examen.fecha_apertura
                       ? `Abre ${new Date(
                           examen.fecha_apertura
@@ -335,15 +318,15 @@ export default async function DetalleCursoEstudiante({
                   </p>
 
                   {examen.entrega ? (
-                    <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
+                    <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
                       {evaluacion ? (
-                        <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                        <p className="font-medium text-ink">
                           Calificación: {evaluacion.calificacion_final}/10
                         </p>
                       ) : (
-                        <p className="text-zinc-500 dark:text-zinc-500">
+                        <span className="badge-pendiente">
                           Presentado, calificando…
-                        </p>
+                        </span>
                       )}
                     </div>
                   ) : estado === "ABIERTA" ? (
@@ -353,7 +336,7 @@ export default async function DetalleCursoEstudiante({
                       preguntas={examen.preguntas}
                     />
                   ) : (
-                    <p className="mt-3 border-t border-zinc-200 pt-3 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-500">
+                    <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/50">
                       No se puede presentar. {motivoCierre(examen)}
                     </p>
                   )}

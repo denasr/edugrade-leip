@@ -103,24 +103,19 @@ export default async function DetalleActividadDocente({
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
       <div className="w-full max-w-sm text-center">
-        <Link
-          href={`/docente/cursos/${actividad.curso_id}`}
-          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-        >
+        <Link href={`/docente/cursos/${actividad.curso_id}`} className="link-muted">
           ← {actividad.cursos?.nombre}
         </Link>
-        <h1 className="mt-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="mt-2 font-title text-2xl text-verde-bosque">
           {actividad.titulo}
         </h1>
       </div>
 
       <section className="w-full max-w-sm">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Entregas
-        </h2>
+        <h2 className="font-title text-xl text-verde-bosque">Entregas</h2>
 
         {entregasConEnlace.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-4 text-sm text-ink/60">
             Todavía no hay entregas para esta tarea.
           </p>
         ) : (
@@ -128,20 +123,17 @@ export default async function DetalleActividadDocente({
             {entregasConEnlace.map((entrega) => {
               const evaluacion = entrega.evaluaciones;
               return (
-                <li
-                  key={entrega.id}
-                  className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
-                >
+                <li key={entrega.id} className="card p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                    <p className="font-medium text-ink">
                       {entrega.nombreEstudiante}
                     </p>
                     <span
-                      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
+                      className={
                         entrega.estado === "CALIFICADO"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      }`}
+                          ? "badge-calificado"
+                          : "badge-pendiente"
+                      }
                     >
                       {entrega.estado === "CALIFICADO"
                         ? "Calificado"
@@ -149,12 +141,12 @@ export default async function DetalleActividadDocente({
                     </span>
                   </div>
 
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                  <p className="mt-1 text-xs text-ink/50">
                     {new Date(entrega.created_at).toLocaleString("es-MX")}
                   </p>
 
                   {entrega.comentario_estudiante && (
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-1 text-sm text-ink/70">
                       Comentario: {entrega.comentario_estudiante}
                     </p>
                   )}
@@ -162,7 +154,7 @@ export default async function DetalleActividadDocente({
                   {entrega.enlaceDescarga && (
                     <a
                       href={entrega.enlaceDescarga}
-                      className="mt-2 inline-block text-sm font-medium text-zinc-900 hover:underline dark:text-zinc-50"
+                      className="mt-2 inline-block text-sm font-medium text-verde-bosque hover:underline"
                     >
                       Descargar {entrega.nombreArchivo}
                     </a>

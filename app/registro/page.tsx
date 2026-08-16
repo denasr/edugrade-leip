@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 type Rol = "DOCENTE" | "ESTUDIANTE";
@@ -56,11 +57,11 @@ export default function RegistroPage() {
   if (resultado?.tipo === "REVISAR_CORREO") {
     return (
       <main className="flex flex-1 items-center justify-center px-4">
-        <div className="w-full max-w-sm text-center">
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <div className="card w-full max-w-sm p-6 text-center">
+          <h1 className="font-title text-2xl text-verde-bosque">
             Revisa tu correo
           </h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-ink/70">
             Enviamos un enlace de confirmación a {resultado.correo}. Confírmalo
             para poder iniciar sesión.
           </p>
@@ -70,24 +71,21 @@ export default function RegistroPage() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-lg border border-zinc-200 p-6 dark:border-zinc-800"
-      >
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+    <main className="flex flex-1 items-center justify-center px-4 py-16">
+      <form onSubmit={handleSubmit} className="card w-full max-w-sm p-6">
+        <h1 className="font-title text-2xl text-verde-bosque">
           Crear cuenta
         </h1>
 
         <div className="mt-6 flex flex-col gap-4">
           <fieldset className="flex gap-4">
-            <legend className="mb-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <legend className="mb-1 text-sm font-medium text-ink/80">
               Rol
             </legend>
             {(["ESTUDIANTE", "DOCENTE"] as const).map((opcion) => (
               <label
                 key={opcion}
-                className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300"
+                className="flex items-center gap-2 text-sm text-ink/80"
               >
                 <input
                   type="radio"
@@ -95,35 +93,36 @@ export default function RegistroPage() {
                   value={opcion}
                   checked={rol === opcion}
                   onChange={() => setRol(opcion)}
+                  className="accent-verde-bosque"
                 />
                 {opcion === "ESTUDIANTE" ? "Estudiante" : "Docente"}
               </label>
             ))}
           </fieldset>
 
-          <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+          <label className="flex flex-col gap-1 text-sm text-ink/80">
             Nombre completo
             <input
               type="text"
               required
               value={nombreCompleto}
               onChange={(e) => setNombreCompleto(e.target.value)}
-              className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              className="input"
             />
           </label>
 
-          <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+          <label className="flex flex-col gap-1 text-sm text-ink/80">
             Correo electrónico
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              className="input"
             />
           </label>
 
-          <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+          <label className="flex flex-col gap-1 text-sm text-ink/80">
             Contraseña
             <input
               type="password"
@@ -131,22 +130,23 @@ export default function RegistroPage() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+              className="input"
             />
           </label>
 
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          )}
+          {error && <p className="text-sm text-terracota">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={cargando}
-            className="mt-2 rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
-          >
+          <button type="submit" disabled={cargando} className="btn-primary mt-2">
             {cargando ? "Creando cuenta…" : "Crear cuenta"}
           </button>
         </div>
+
+        <p className="mt-6 text-center text-sm text-ink/60">
+          ¿Ya tienes cuenta?{" "}
+          <Link href="/login" className="text-verde-bosque hover:underline">
+            Inicia sesión
+          </Link>
+        </p>
       </form>
     </main>
   );

@@ -38,10 +38,10 @@ export default async function PanelEstudiante() {
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
       <div className="text-center">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="font-title text-2xl text-verde-bosque">
           Panel del estudiante
         </h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-sm text-ink/70">
           Bienvenido, {perfil.nombre_completo}.
         </p>
       </div>
@@ -50,7 +50,7 @@ export default async function PanelEstudiante() {
         <FormularioInscripcion />
       ) : (
         <section className="w-full max-w-sm">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          <h2 className="font-title text-xl text-verde-bosque">
             Mis cursos
           </h2>
           <ul className="mt-4 flex flex-col gap-3">
@@ -60,13 +60,11 @@ export default async function PanelEstudiante() {
               return (
                 <li
                   key={inscripcion.id}
-                  className="rounded-lg border border-zinc-200 p-4 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+                  className="card p-4 transition-shadow hover:shadow-md"
                 >
                   <Link href={`/estudiante/cursos/${curso.id}`}>
-                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                      {curso.nombre}
-                    </p>
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="font-medium text-ink">{curso.nombre}</p>
+                    <p className="text-sm text-ink/60">
                       {curso.grupo} · {curso.periodo}
                     </p>
                   </Link>

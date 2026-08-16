@@ -29,9 +29,9 @@ export default function FormularioCalificacion({
   return (
     <form
       action={formAction}
-      className="mt-3 flex flex-col gap-2 border-t border-zinc-200 pt-3 dark:border-zinc-800"
+      className="mt-3 flex flex-col gap-2 border-t border-verde-bosque/15 pt-3"
     >
-      <label className="flex w-24 flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      <label className="flex w-24 flex-col gap-1 text-sm text-ink/80">
         Nota
         <input
           type="number"
@@ -41,30 +41,26 @@ export default function FormularioCalificacion({
           max={10}
           step="0.1"
           defaultValue={notaActual ?? undefined}
-          className="rounded border border-zinc-300 px-2 py-1 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          className="input py-1"
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      <label className="flex flex-col gap-1 text-sm text-ink/80">
         Retroalimentación
         <textarea
           name="retroalimentacion"
           rows={2}
           defaultValue={comentarioActual ?? ""}
-          className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          className="input"
         />
       </label>
 
-      {state.error && (
-        <p className="text-sm text-red-600 dark:text-red-400">
-          {state.error}
-        </p>
-      )}
+      {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
+        className="btn-primary self-start px-4 py-1.5"
       >
         {pending
           ? "Guardando…"

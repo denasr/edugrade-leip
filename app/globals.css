@@ -1,26 +1,77 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4efde;
+  --foreground: #2a2a24;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-crema: #f4efde;
+  --color-verde-bosque: #1f3b2e;
+  --color-terracota: #b5533c;
+  --color-ink: #2a2a24;
+  --color-superficie: #ffffff;
+
+  --color-abierta: #c08a2e;
+  --color-cerrada: #8c8371;
+  --color-pendiente: #b5533c;
+  --color-calificado: #1f3b2e;
+
+  --font-title: var(--font-source-serif);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-space-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-verde-bosque/15 bg-superficie shadow-sm shadow-verde-bosque/5;
+  }
+
+  .btn-primary {
+    @apply rounded-full bg-verde-bosque px-5 py-2 text-sm font-medium text-crema transition-colors hover:bg-verde-bosque/90 disabled:opacity-50;
+  }
+
+  .btn-accent {
+    @apply rounded-full bg-terracota px-5 py-2 text-sm font-medium text-crema transition-colors hover:bg-terracota/90 disabled:opacity-50;
+  }
+
+  .btn-text-accent {
+    @apply text-sm font-medium text-terracota transition-colors hover:text-terracota/80;
+  }
+
+  .input {
+    @apply rounded-lg border border-verde-bosque/20 bg-superficie px-3 py-2 text-ink placeholder:text-ink/40 focus:border-verde-bosque/50 focus:outline-none;
+  }
+
+  .link-muted {
+    @apply text-sm text-ink/60 transition-colors hover:text-verde-bosque hover:underline;
+  }
+
+  .clave-acceso {
+    @apply inline-block rounded-md bg-verde-bosque/8 px-2 py-1 font-mono text-sm tracking-wide text-verde-bosque;
+  }
+
+  .badge-abierta {
+    @apply inline-block shrink-0 rounded-full bg-abierta/12 px-2.5 py-0.5 text-xs font-medium text-abierta;
+  }
+
+  .badge-cerrada {
+    @apply inline-block shrink-0 rounded-full bg-cerrada/15 px-2.5 py-0.5 text-xs font-medium text-cerrada;
+  }
+
+  .badge-pendiente {
+    @apply inline-block shrink-0 rounded-full bg-pendiente/12 px-2.5 py-0.5 text-xs font-medium text-pendiente;
+  }
+
+  .badge-calificado {
+    @apply inline-block shrink-0 rounded-full bg-calificado/10 px-2.5 py-0.5 text-xs font-medium text-calificado;
+  }
 }

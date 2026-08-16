@@ -79,55 +79,36 @@ export default function FormularioCrearExamen({
   );
 
   return (
-    <form
-      ref={formRef}
-      action={formAction}
-      className="w-full max-w-sm rounded-lg border border-zinc-200 p-6 dark:border-zinc-800"
-    >
-      <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        Nuevo examen
-      </h2>
+    <form ref={formRef} action={formAction} className="card w-full max-w-sm p-6">
+      <h2 className="font-title text-xl text-verde-bosque">Nuevo examen</h2>
 
       <div className="mt-4 flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Título
-          <input
-            type="text"
-            name="titulo"
-            required
-            className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
+          <input type="text" name="titulo" required className="input" />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Instrucciones
-          <textarea
-            name="instrucciones"
-            rows={2}
-            className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
+          <textarea name="instrucciones" rows={2} className="input" />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Fecha de apertura (opcional)
-          <input
-            type="datetime-local"
-            name="fecha_apertura"
-            className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
+          <input type="datetime-local" name="fecha_apertura" className="input" />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Fecha de cierre
           <input
             type="datetime-local"
             name="fecha_cierre"
             required
-            className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            className="input"
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Ponderación
           <input
             type="number"
@@ -136,29 +117,27 @@ export default function FormularioCrearExamen({
             min={0}
             step="any"
             defaultValue={10}
-            className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            className="input"
           />
         </label>
 
-        <div className="flex flex-col gap-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Preguntas
-          </p>
+        <div className="flex flex-col gap-3 border-t border-verde-bosque/15 pt-3">
+          <p className="text-sm font-medium text-ink/80">Preguntas</p>
 
           {preguntas.map((pregunta, indice) => (
             <div
               key={indice}
-              className="flex flex-col gap-2 rounded border border-zinc-200 p-3 dark:border-zinc-800"
+              className="flex flex-col gap-2 rounded-lg border border-verde-bosque/15 bg-crema/40 p-3"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-zinc-500 dark:text-zinc-500">
+                <span className="text-xs font-medium text-ink/50">
                   Pregunta {indice + 1}
                 </span>
                 {preguntas.length > 1 && (
                   <button
                     type="button"
                     onClick={() => quitarPregunta(indice)}
-                    className="text-xs text-red-600 hover:underline dark:text-red-400"
+                    className="text-xs text-terracota hover:underline"
                   >
                     Quitar
                   </button>
@@ -173,13 +152,13 @@ export default function FormularioCrearExamen({
                 onChange={(e) =>
                   actualizarPregunta(indice, { enunciado: e.target.value })
                 }
-                className="rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                className="input text-sm"
               />
 
               {pregunta.opciones.map((opcion, opcionIndice) => (
                 <label
                   key={opcionIndice}
-                  className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300"
+                  className="flex items-center gap-2 text-sm text-ink/80"
                 >
                   <input
                     type="radio"
@@ -188,6 +167,7 @@ export default function FormularioCrearExamen({
                     onChange={() =>
                       actualizarPregunta(indice, { correcta: opcionIndice })
                     }
+                    className="accent-verde-bosque"
                   />
                   <input
                     type="text"
@@ -197,15 +177,15 @@ export default function FormularioCrearExamen({
                     onChange={(e) =>
                       actualizarOpcion(indice, opcionIndice, e.target.value)
                     }
-                    className="flex-1 rounded border border-zinc-300 px-2 py-1 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                    className="input flex-1 py-1 text-sm"
                   />
                 </label>
               ))}
-              <span className="text-xs text-zinc-500 dark:text-zinc-500">
+              <span className="text-xs text-ink/50">
                 Marca con el radio cuál opción es la correcta.
               </span>
 
-              <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <label className="flex items-center gap-2 text-sm text-ink/80">
                 Puntos
                 <input
                   type="number"
@@ -217,7 +197,7 @@ export default function FormularioCrearExamen({
                       puntos: Number(e.target.value),
                     })
                   }
-                  className="w-20 rounded border border-zinc-300 px-2 py-1 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  className="input w-20 py-1"
                 />
               </label>
             </div>
@@ -226,7 +206,7 @@ export default function FormularioCrearExamen({
           <button
             type="button"
             onClick={agregarPregunta}
-            className="self-start text-sm text-zinc-700 hover:underline dark:text-zinc-300"
+            className="self-start text-sm font-medium text-verde-bosque hover:underline"
           >
             + Agregar pregunta
           </button>
@@ -234,17 +214,9 @@ export default function FormularioCrearExamen({
 
         <input type="hidden" name="preguntas" value={preguntasJson} />
 
-        {state.error && (
-          <p className="text-sm text-red-600 dark:text-red-400">
-            {state.error}
-          </p>
-        )}
+        {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="mt-2 rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
-        >
+        <button type="submit" disabled={pending} className="btn-primary mt-2">
           {pending ? "Creando…" : "Crear examen"}
         </button>
       </div>

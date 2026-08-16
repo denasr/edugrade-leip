@@ -16,7 +16,7 @@ export default function BotonEliminarActividad({
             e.preventDefault();
           }
         }}
-        className="text-sm text-red-600 hover:underline dark:text-red-400"
+        className="btn-text-accent"
       >
         Eliminar
       </button>

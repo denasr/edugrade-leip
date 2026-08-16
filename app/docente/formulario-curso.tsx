@@ -42,47 +42,26 @@ export default function FormularioCurso() {
   }, [state, pending]);
 
   return (
-    <form
-      ref={formRef}
-      action={formAction}
-      className="w-full max-w-sm rounded-lg border border-zinc-200 p-6 dark:border-zinc-800"
-    >
-      <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        Crear curso
-      </h2>
+    <form ref={formRef} action={formAction} className="card w-full max-w-sm p-6">
+      <h2 className="font-title text-xl text-verde-bosque">Crear curso</h2>
 
       <div className="mt-4 flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Nombre
-          <input
-            type="text"
-            name="nombre"
-            required
-            className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
+          <input type="text" name="nombre" required className="input" />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Grupo
-          <input
-            type="text"
-            name="grupo"
-            required
-            className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
+          <input type="text" name="grupo" required className="input" />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Periodo
-          <input
-            type="text"
-            name="periodo"
-            required
-            className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-          />
+          <input type="text" name="periodo" required className="input" />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
           Clave de acceso
           <input
             type="text"
@@ -90,21 +69,13 @@ export default function FormularioCurso() {
             required
             value={claveAcceso}
             onChange={(e) => setClaveAcceso(e.target.value.toUpperCase())}
-            className="rounded border border-zinc-300 px-3 py-2 font-mono text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            className="input font-mono tracking-wide"
           />
         </label>
 
-        {state.error && (
-          <p className="text-sm text-red-600 dark:text-red-400">
-            {state.error}
-          </p>
-        )}
+        {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="mt-2 rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
-        >
+        <button type="submit" disabled={pending} className="btn-primary mt-2">
           {pending ? "Creando…" : "Crear curso"}
         </button>
       </div>

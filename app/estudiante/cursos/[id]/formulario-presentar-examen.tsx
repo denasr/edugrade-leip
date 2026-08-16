@@ -30,23 +30,24 @@ export default function FormularioPresentarExamen({
   return (
     <form
       action={formAction}
-      className="mt-3 flex flex-col gap-4 border-t border-zinc-200 pt-3 dark:border-zinc-800"
+      className="mt-3 flex flex-col gap-4 border-t border-verde-bosque/15 pt-3"
     >
       {preguntas.map((pregunta, indice) => (
         <fieldset key={pregunta.id} className="flex flex-col gap-1">
-          <legend className="text-sm text-zinc-700 dark:text-zinc-300">
+          <legend className="text-sm text-ink/80">
             {indice + 1}. {pregunta.enunciado}
           </legend>
           {pregunta.opciones.map((opcion, opcionIndice) => (
             <label
               key={opcionIndice}
-              className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"
+              className="flex items-center gap-2 text-sm text-ink/70"
             >
               <input
                 type="radio"
                 name={`respuesta-${pregunta.id}`}
                 value={opcion}
                 required
+                className="accent-verde-bosque"
               />
               {opcion}
             </label>
@@ -54,16 +55,12 @@ export default function FormularioPresentarExamen({
         </fieldset>
       ))}
 
-      {state.error && (
-        <p className="text-sm text-red-600 dark:text-red-400">
-          {state.error}
-        </p>
-      )}
+      {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
+        className="btn-primary self-start"
       >
         {pending ? "Enviando…" : "Enviar examen"}
       </button>

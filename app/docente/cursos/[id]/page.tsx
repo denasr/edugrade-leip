@@ -117,32 +117,25 @@ export default async function DetalleCursoDocente({
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
       <div className="w-full max-w-sm text-center">
-        <Link
-          href="/docente"
-          className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
-        >
+        <Link href="/docente" className="link-muted">
           ← Mis cursos
         </Link>
-        <h1 className="mt-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="mt-2 font-title text-2xl text-verde-bosque">
           {curso.nombre}
         </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-1 text-sm text-ink/70">
           {curso.grupo} · {curso.periodo}
         </p>
-        <span className="mt-2 inline-block rounded bg-zinc-100 px-2 py-1 font-mono text-sm text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50">
-          {curso.clave_acceso}
-        </span>
+        <span className="clave-acceso mt-2">{curso.clave_acceso}</span>
       </div>
 
       <FormularioActividad cursoId={curso.id} />
 
       <section className="w-full max-w-sm">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Tareas
-        </h2>
+        <h2 className="font-title text-xl text-verde-bosque">Tareas</h2>
 
         {!actividades || actividades.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-4 text-sm text-ink/60">
             Todavía no has creado ninguna tarea.
           </p>
         ) : (
@@ -166,23 +159,20 @@ export default async function DetalleCursoDocente({
               );
 
               return (
-                <li
-                  key={actividad.id}
-                  className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
-                >
+                <li key={actividad.id} className="card p-4">
                   <div className="flex items-start justify-between gap-2">
                     <Link
                       href={`/docente/actividades/${actividad.id}`}
-                      className="font-medium text-zinc-900 hover:underline dark:text-zinc-50"
+                      className="font-medium text-ink hover:underline"
                     >
                       {actividad.titulo}
                     </Link>
                     <span
-                      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
+                      className={
                         estado === "ABIERTA"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      }`}
+                          ? "badge-abierta"
+                          : "badge-cerrada"
+                      }
                     >
                       {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
                     </span>
@@ -190,18 +180,18 @@ export default async function DetalleCursoDocente({
 
                   <Link
                     href={`/docente/actividades/${actividad.id}`}
-                    className="mt-1 inline-block text-xs text-zinc-500 hover:underline dark:text-zinc-500"
+                    className="mt-1 inline-block text-xs text-ink/50 hover:underline"
                   >
                     {conteo.total} entregas · {conteo.pendientes} pendientes
                   </Link>
 
                   {actividad.instrucciones && (
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-1 text-sm text-ink/70">
                       {actividad.instrucciones}
                     </p>
                   )}
 
-                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                  <p className="mt-2 text-xs text-ink/50">
                     {actividad.fecha_apertura
                       ? `Abre ${new Date(
                           actividad.fecha_apertura
@@ -214,17 +204,14 @@ export default async function DetalleCursoDocente({
                   </p>
 
                   {actividad.materiales_actividad.length > 0 && (
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                    <p className="mt-1 text-xs text-ink/50">
                       Material: {actividad.materiales_actividad[0].nombre_archivo}
                     </p>
                   )}
 
                   <div className="mt-3 flex items-center gap-4">
                     <form action={alternarBloqueoAction}>
-                      <button
-                        type="submit"
-                        className="text-sm text-zinc-700 hover:underline dark:text-zinc-300"
-                      >
+                      <button type="submit" className="link-muted">
                         {actividad.bloqueado_manual
                           ? "Desbloquear"
                           : "Bloquear"}
@@ -245,12 +232,10 @@ export default async function DetalleCursoDocente({
       <FormularioCrearExamen cursoId={curso.id} />
 
       <section className="w-full max-w-sm">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Exámenes
-        </h2>
+        <h2 className="font-title text-xl text-verde-bosque">Exámenes</h2>
 
         {!examenes || examenes.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-4 text-sm text-ink/60">
             Todavía no has creado ningún examen.
           </p>
         ) : (
@@ -279,36 +264,31 @@ export default async function DetalleCursoDocente({
               );
 
               return (
-                <li
-                  key={examen.id}
-                  className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
-                >
+                <li key={examen.id} className="card p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                      {examen.titulo}
-                    </p>
+                    <p className="font-medium text-ink">{examen.titulo}</p>
                     <span
-                      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
+                      className={
                         estado === "ABIERTA"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      }`}
+                          ? "badge-abierta"
+                          : "badge-cerrada"
+                      }
                     >
                       {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
                     </span>
                   </div>
 
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                  <p className="mt-1 text-xs text-ink/50">
                     {stats.presentados} presentados · promedio {promedio}/10
                   </p>
 
                   {examen.instrucciones && (
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-1 text-sm text-ink/70">
                       {examen.instrucciones}
                     </p>
                   )}
 
-                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                  <p className="mt-2 text-xs text-ink/50">
                     {examen.fecha_apertura
                       ? `Abre ${new Date(
                           examen.fecha_apertura
@@ -322,10 +302,7 @@ export default async function DetalleCursoDocente({
 
                   <div className="mt-3 flex items-center gap-4">
                     <form action={alternarBloqueoAction}>
-                      <button
-                        type="submit"
-                        className="text-sm text-zinc-700 hover:underline dark:text-zinc-300"
-                      >
+                      <button type="submit" className="link-muted">
                         {examen.bloqueado_manual ? "Desbloquear" : "Bloquear"}
                       </button>
                     </form>

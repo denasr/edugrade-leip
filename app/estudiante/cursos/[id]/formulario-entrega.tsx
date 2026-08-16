@@ -37,41 +37,33 @@ export default function FormularioEntrega({
       ref={formRef}
       action={formAction}
       onSubmit={validarArchivo}
-      className="mt-3 flex flex-col gap-3 border-t border-zinc-200 pt-3 dark:border-zinc-800"
+      className="mt-3 flex flex-col gap-3 border-t border-verde-bosque/15 pt-3"
     >
-      <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      <label className="flex flex-col gap-1 text-sm text-ink/80">
         Archivo
         <input
           type="file"
           name="archivo"
           required
           accept=".pdf,.docx,.jpg,.jpeg,.png"
-          className="text-sm text-zinc-700 dark:text-zinc-300"
+          className="text-sm text-ink/70 file:mr-3 file:rounded-full file:border-0 file:bg-verde-bosque/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-verde-bosque"
         />
-        <span className="text-xs text-zinc-500 dark:text-zinc-500">
+        <span className="text-xs text-ink/50">
           PDF, DOCX, JPG o PNG. Máximo 10 MB.
         </span>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      <label className="flex flex-col gap-1 text-sm text-ink/80">
         Comentario (opcional)
-        <textarea
-          name="comentario"
-          rows={2}
-          className="rounded border border-zinc-300 px-3 py-2 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-        />
+        <textarea name="comentario" rows={2} className="input" />
       </label>
 
-      {state.error && (
-        <p className="text-sm text-red-600 dark:text-red-400">
-          {state.error}
-        </p>
-      )}
+      {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
+        className="btn-primary self-start"
       >
         {pending ? "Entregando…" : "Entregar tarea"}
       </button>
