@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { estadoActividad, motivoCierre } from "@/lib/actividades";
 import FormularioEntrega from "./formulario-entrega";
+import FormularioPresentarExamen from "./formulario-presentar-examen";
 
 export default async function DetalleCursoEstudiante({
   params,
@@ -96,6 +97,65 @@ export default async function DetalleCursoEstudiante({
         enlaceDescarga,
         entrega: entregasPorActividad.get(actividad.id) ?? null,
       };
+    })
+  );
+
+  const { data: examenes } = await supabase
+    .from("actividades")
+    .select(
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, ponderacion, bloqueado_manual"
+    )
+    .eq("curso_id", id)
+    .eq("tipo", "EXAMEN")
+    .order("created_at", { ascending: false });
+
+  const examenIds = (examenes ?? []).map((e) => e.id);
+
+  type EntregaExamenPropia = {
+    actividad_id: string;
+    evaluaciones: {
+      calificacion_final: number;
+      comentarios: string | null;
+    } | null;
+  };
+
+  const { data: entregasExamen } = (
+    examenIds.length > 0
+      ? await supabase
+          .from("entregas")
+          .select("actividad_id, evaluaciones(calificacion_final, comentarios)")
+          .eq("estudiante_id", user.id)
+          .in("actividad_id", examenIds)
+      : { data: [] }
+  ) as { data: EntregaExamenPropia[] | null };
+
+  const entregaExamenPorActividad = new Map(
+    (entregasExamen ?? []).map((e) => [e.actividad_id, e])
+  );
+
+  type PreguntaEstudiante = {
+    id: string;
+    enunciado: string;
+    opciones: string[];
+    puntos: number;
+  };
+
+  const examenesConPreguntas = await Promise.all(
+    (examenes ?? []).map(async (examen) => {
+      const entrega = entregaExamenPorActividad.get(examen.id) ?? null;
+      const estado = estadoActividad(examen);
+      let preguntas: PreguntaEstudiante[] = [];
+
+      if (!entrega && estado === "ABIERTA") {
+        const { data } = await supabase
+          .from("preguntas_examen_estudiante")
+          .select("id, enunciado, opciones, puntos")
+          .eq("actividad_id", examen.id)
+          .order("orden", { ascending: true });
+        preguntas = (data ?? []) as PreguntaEstudiante[];
+      }
+
+      return { ...examen, entrega, preguntas };
     })
   );
 
@@ -212,6 +272,89 @@ export default async function DetalleCursoEstudiante({
                   ) : (
                     <p className="mt-3 border-t border-zinc-200 pt-3 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-500">
                       No se puede entregar. {motivoCierre(actividad)}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="w-full max-w-sm">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          Exámenes
+        </h2>
+
+        {examenesConPreguntas.length === 0 ? (
+          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+            Todavía no hay exámenes publicados en este curso.
+          </p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-3">
+            {examenesConPreguntas.map((examen) => {
+              const estado = estadoActividad(examen);
+              const evaluacion = examen.entrega?.evaluaciones ?? null;
+
+              return (
+                <li
+                  key={examen.id}
+                  className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                      {examen.titulo}
+                    </p>
+                    <span
+                      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
+                        estado === "ABIERTA"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
+                    </span>
+                  </div>
+
+                  {examen.instrucciones && (
+                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                      {examen.instrucciones}
+                    </p>
+                  )}
+
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+                    {examen.fecha_apertura
+                      ? `Abre ${new Date(
+                          examen.fecha_apertura
+                        ).toLocaleString("es-MX")} · `
+                      : ""}
+                    Cierra{" "}
+                    {new Date(examen.fecha_cierre).toLocaleString("es-MX")}
+                    {" · "}
+                    Ponderación {examen.ponderacion}
+                  </p>
+
+                  {examen.entrega ? (
+                    <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
+                      {evaluacion ? (
+                        <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                          Calificación: {evaluacion.calificacion_final}/10
+                        </p>
+                      ) : (
+                        <p className="text-zinc-500 dark:text-zinc-500">
+                          Presentado, calificando…
+                        </p>
+                      )}
+                    </div>
+                  ) : estado === "ABIERTA" ? (
+                    <FormularioPresentarExamen
+                      actividadId={examen.id}
+                      cursoId={id}
+                      preguntas={examen.preguntas}
+                    />
+                  ) : (
+                    <p className="mt-3 border-t border-zinc-200 pt-3 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-500">
+                      No se puede presentar. {motivoCierre(examen)}
                     </p>
                   )}
                 </li>

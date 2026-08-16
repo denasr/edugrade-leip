@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EstadoActividad = { error: string | null };
 
@@ -120,6 +121,132 @@ export async function alternarBloqueo(
     .eq("id", actividadId);
 
   revalidatePath(`/docente/cursos/${cursoId}`);
+}
+
+type PreguntaEntrada = {
+  enunciado: string;
+  opciones: string[];
+  correcta: string;
+  puntos: number;
+};
+
+export async function crearExamen(
+  cursoId: string,
+  _estadoPrevio: EstadoActividad,
+  formData: FormData
+): Promise<EstadoActividad> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  // Verifica con el cliente normal (RLS) que quien llama es el docente dueño
+  // del curso. Solo después de esto se usa la secret key, y únicamente para
+  // tocar preguntas_examen (que no tiene policies para 'authenticated').
+  const { data: curso } = await supabase
+    .from("cursos")
+    .select("id")
+    .eq("id", cursoId)
+    .eq("docente_id", user.id)
+    .maybeSingle();
+
+  if (!curso) {
+    return { error: "No tienes permiso sobre este curso." };
+  }
+
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  const instrucciones = String(formData.get("instrucciones") ?? "").trim();
+  const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
+  const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
+  const ponderacion = String(formData.get("ponderacion") ?? "").trim();
+  const preguntasJson = String(formData.get("preguntas") ?? "");
+
+  if (!titulo || !fechaCierre || !ponderacion) {
+    return {
+      error: "Título, fecha de cierre y ponderación son obligatorios.",
+    };
+  }
+
+  let preguntas: PreguntaEntrada[];
+  try {
+    preguntas = JSON.parse(preguntasJson);
+  } catch {
+    return { error: "No se pudieron leer las preguntas." };
+  }
+
+  if (!Array.isArray(preguntas) || preguntas.length === 0) {
+    return { error: "Agrega al menos una pregunta." };
+  }
+
+  const preguntasNormalizadas = preguntas.map((p) => ({
+    enunciado: String(p.enunciado ?? "").trim(),
+    opciones: (p.opciones ?? []).map((o) => String(o).trim()),
+    correcta: String(p.correcta ?? "").trim(),
+    puntos: Number(p.puntos),
+  }));
+
+  for (const [i, p] of preguntasNormalizadas.entries()) {
+    if (!p.enunciado) {
+      return { error: `La pregunta ${i + 1} necesita un enunciado.` };
+    }
+    if (p.opciones.length !== 4 || p.opciones.some((o) => !o)) {
+      return { error: `La pregunta ${i + 1} necesita 4 opciones no vacías.` };
+    }
+    if (!p.opciones.includes(p.correcta)) {
+      return {
+        error: `La pregunta ${i + 1} necesita marcar cuál opción es correcta.`,
+      };
+    }
+    if (!Number.isFinite(p.puntos) || p.puntos <= 0) {
+      return { error: `La pregunta ${i + 1} necesita puntos mayores a 0.` };
+    }
+  }
+
+  const { data: actividad, error: errorInsert } = await supabase
+    .from("actividades")
+    .insert({
+      curso_id: cursoId,
+      titulo,
+      tipo: "EXAMEN",
+      instrucciones: instrucciones || null,
+      fecha_apertura: fechaApertura || null,
+      fecha_cierre: fechaCierre,
+      ponderacion: Number(ponderacion),
+    })
+    .select("id")
+    .single();
+
+  if (errorInsert || !actividad) {
+    return {
+      error: errorInsert?.message ?? "No se pudo crear el examen.",
+    };
+  }
+
+  const admin = createAdminClient();
+  const { error: errorPreguntas } = await admin
+    .from("preguntas_examen")
+    .insert(
+      preguntasNormalizadas.map((p, i) => ({
+        actividad_id: actividad.id,
+        enunciado: p.enunciado,
+        opciones: p.opciones,
+        correcta: p.correcta,
+        puntos: p.puntos,
+        orden: i,
+      }))
+    );
+
+  if (errorPreguntas) {
+    await supabase.from("actividades").delete().eq("id", actividad.id);
+    return { error: errorPreguntas.message };
+  }
+
+  revalidatePath(`/docente/cursos/${cursoId}`);
+  return { error: null };
 }
 
 export async function eliminarActividad(

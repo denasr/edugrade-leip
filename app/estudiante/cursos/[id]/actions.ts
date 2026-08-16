@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EstadoEntrega = { error: string | null };
+export type EstadoExamen = { error: string | null };
 
 const TIPOS_PERMITIDOS = [
   "application/pdf",
@@ -86,6 +88,119 @@ export async function entregarTarea(
     await supabase.storage.from("archivos-entrega").remove([storagePath]);
     await supabase.from("entregas").delete().eq("id", entrega.id);
     return { error: errorArchivo.message };
+  }
+
+  revalidatePath(`/estudiante/cursos/${cursoId}`);
+  return { error: null };
+}
+
+export async function presentarExamen(
+  actividadId: string,
+  cursoId: string,
+  _estadoPrevio: EstadoExamen,
+  formData: FormData
+): Promise<EstadoExamen> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  const respuestas: { pregunta_id: string; respuesta_seleccionada: string }[] =
+    [];
+  for (const [nombre, valor] of formData.entries()) {
+    if (nombre.startsWith("respuesta-") && typeof valor === "string" && valor) {
+      respuestas.push({
+        pregunta_id: nombre.slice("respuesta-".length),
+        respuesta_seleccionada: valor,
+      });
+    }
+  }
+
+  if (respuestas.length === 0) {
+    return { error: "Responde al menos una pregunta." };
+  }
+
+  const { data: entrega, error: errorInsert } = await supabase
+    .from("entregas")
+    .insert({
+      actividad_id: actividadId,
+      estudiante_id: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (errorInsert || !entrega) {
+    if (errorInsert?.code === "23505") {
+      return { error: "Ya presentaste este examen." };
+    }
+    return {
+      error:
+        errorInsert?.message ??
+        "No se pudo registrar tu examen. Verifica que siga abierto.",
+    };
+  }
+
+  const { error: errorRespuestas } = await supabase
+    .from("respuestas_examen")
+    .insert(
+      respuestas.map((r) => ({
+        entrega_id: entrega.id,
+        pregunta_id: r.pregunta_id,
+        respuesta_seleccionada: r.respuesta_seleccionada,
+      }))
+    );
+
+  if (errorRespuestas) {
+    await supabase.from("entregas").delete().eq("id", entrega.id);
+    return { error: errorRespuestas.message };
+  }
+
+  // Calificar: preguntas_examen (con `correcta`) solo es legible con la
+  // secret key. Este resultado nunca llega al navegador; solo la nota final.
+  const admin = createAdminClient();
+  const { data: preguntas, error: errorPreguntas } = await admin
+    .from("preguntas_examen")
+    .select("id, correcta, puntos")
+    .eq("actividad_id", actividadId);
+
+  if (errorPreguntas || !preguntas || preguntas.length === 0) {
+    return {
+      error:
+        "Tu examen se registró, pero no se pudo calificar automáticamente. Avísale a tu docente.",
+    };
+  }
+
+  const puntosTotales = preguntas.reduce(
+    (suma, p) => suma + Number(p.puntos),
+    0
+  );
+  const respuestasPorPregunta = new Map(
+    respuestas.map((r) => [r.pregunta_id, r.respuesta_seleccionada])
+  );
+  const puntosObtenidos = preguntas.reduce((suma, p) => {
+    const respuesta = respuestasPorPregunta.get(p.id);
+    return respuesta === p.correcta ? suma + Number(p.puntos) : suma;
+  }, 0);
+
+  const notaSobreDiez =
+    puntosTotales > 0 ? (puntosObtenidos / puntosTotales) * 10 : 0;
+  const calificacionFinal = Math.round(notaSobreDiez * 100) / 100;
+
+  const { error: errorEvaluacion } = await admin.from("evaluaciones").insert({
+    entrega_id: entrega.id,
+    calificacion_final: calificacionFinal,
+    origen: "AUTO_EXAMEN",
+  });
+
+  if (errorEvaluacion) {
+    return {
+      error:
+        "Tu examen se registró, pero no se pudo calificar automáticamente. Avísale a tu docente.",
+    };
   }
 
   revalidatePath(`/estudiante/cursos/${cursoId}`);
