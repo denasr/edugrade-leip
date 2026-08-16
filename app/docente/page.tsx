@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import FormularioCurso from "./formulario-curso";
 
@@ -51,22 +52,24 @@ export default async function PanelDocente() {
             {cursos.map((curso) => (
               <li
                 key={curso.id}
-                className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
+                className="rounded-lg border border-zinc-200 p-4 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
               >
-                <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                  {curso.nombre}
-                </p>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {curso.grupo} · {curso.periodo}
-                </p>
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="rounded bg-zinc-100 px-2 py-1 font-mono text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50">
-                    {curso.clave_acceso}
-                  </span>
-                  <span className="text-zinc-600 dark:text-zinc-400">
-                    {curso.inscripciones[0]?.count ?? 0} inscritos
-                  </span>
-                </div>
+                <Link href={`/docente/cursos/${curso.id}`}>
+                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                    {curso.nombre}
+                  </p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {curso.grupo} · {curso.periodo}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="rounded bg-zinc-100 px-2 py-1 font-mono text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50">
+                      {curso.clave_acceso}
+                    </span>
+                    <span className="text-zinc-600 dark:text-zinc-400">
+                      {curso.inscripciones[0]?.count ?? 0} inscritos
+                    </span>
+                  </div>
+                </Link>
               </li>
             ))}
           </ul>

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import FormularioInscripcion from "./formulario-inscripcion";
 
@@ -7,7 +8,7 @@ import FormularioInscripcion from "./formulario-inscripcion";
 // (sin generar tipos desde el esquema) lo infiere como arreglo, por eso el cast.
 type InscripcionConCurso = {
   id: string;
-  cursos: { nombre: string; grupo: string; periodo: string } | null;
+  cursos: { id: string; nombre: string; grupo: string; periodo: string } | null;
 };
 
 export default async function PanelEstudiante() {
@@ -28,7 +29,7 @@ export default async function PanelEstudiante() {
 
   const { data: inscripciones } = (await supabase
     .from("inscripciones")
-    .select("id, cursos(nombre, grupo, periodo)")
+    .select("id, cursos(id, nombre, grupo, periodo)")
     .eq("estudiante_id", user.id)
     .order("created_at", { ascending: false })) as {
     data: InscripcionConCurso[] | null;
@@ -55,17 +56,20 @@ export default async function PanelEstudiante() {
           <ul className="mt-4 flex flex-col gap-3">
             {inscripciones.map((inscripcion) => {
               const curso = inscripcion.cursos;
+              if (!curso) return null;
               return (
                 <li
                   key={inscripcion.id}
-                  className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
+                  className="rounded-lg border border-zinc-200 p-4 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
                 >
-                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                    {curso?.nombre}
-                  </p>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {curso?.grupo} · {curso?.periodo}
-                  </p>
+                  <Link href={`/estudiante/cursos/${curso.id}`}>
+                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                      {curso.nombre}
+                    </p>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {curso.grupo} · {curso.periodo}
+                    </p>
+                  </Link>
                 </li>
               );
             })}
