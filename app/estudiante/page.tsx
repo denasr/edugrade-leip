@@ -17,7 +17,7 @@ export default async function PanelEstudiante() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/registro");
+  if (!user) redirect("/login");
 
   const { data: perfil } = await supabase
     .from("perfiles")

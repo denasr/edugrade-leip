@@ -25,7 +25,7 @@ export default async function DetalleActividadDocente({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/registro");
+  if (!user) redirect("/login");
 
   const { data: perfil } = await supabase
     .from("perfiles")
