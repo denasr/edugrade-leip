@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { estadoActividad } from "@/lib/actividades";
+import { estadoActividad, motivoCierre } from "@/lib/actividades";
+import FormularioEntrega from "./formulario-entrega";
 
 export default async function DetalleCursoEstudiante({
   params,
@@ -50,6 +51,33 @@ export default async function DetalleCursoEstudiante({
     .eq("tipo", "TAREA")
     .order("created_at", { ascending: false });
 
+  const actividadIds = (actividades ?? []).map((a) => a.id);
+
+  // evaluaciones.entrega_id es UNIQUE, así que Postgrest lo embebe como
+  // objeto (o null), a diferencia de archivos_entrega que sí es un arreglo.
+  type EntregaConDetalle = {
+    actividad_id: string;
+    comentario_estudiante: string | null;
+    archivos_entrega: { nombre_archivo: string }[];
+    evaluaciones: { calificacion_final: number; comentarios: string | null } | null;
+  };
+
+  const { data: entregas } = (
+    actividadIds.length > 0
+      ? await supabase
+          .from("entregas")
+          .select(
+            "id, actividad_id, comentario_estudiante, archivos_entrega(nombre_archivo), evaluaciones(calificacion_final, comentarios)"
+          )
+          .eq("estudiante_id", user.id)
+          .in("actividad_id", actividadIds)
+      : { data: [] }
+  ) as { data: EntregaConDetalle[] | null };
+
+  const entregasPorActividad = new Map(
+    (entregas ?? []).map((entrega) => [entrega.actividad_id, entrega])
+  );
+
   const actividadesConEnlace = await Promise.all(
     (actividades ?? []).map(async (actividad) => {
       const material = actividad.materiales_actividad[0] ?? null;
@@ -66,6 +94,7 @@ export default async function DetalleCursoEstudiante({
         ...actividad,
         nombreArchivo: material?.nombre_archivo ?? null,
         enlaceDescarga,
+        entrega: entregasPorActividad.get(actividad.id) ?? null,
       };
     })
   );
@@ -100,6 +129,10 @@ export default async function DetalleCursoEstudiante({
           <ul className="mt-4 flex flex-col gap-3">
             {actividadesConEnlace.map((actividad) => {
               const estado = estadoActividad(actividad);
+              const evaluacion = actividad.entrega?.evaluaciones ?? null;
+              const archivoEntregado =
+                actividad.entrega?.archivos_entrega[0] ?? null;
+
               return (
                 <li
                   key={actividad.id}
@@ -145,6 +178,41 @@ export default async function DetalleCursoEstudiante({
                     >
                       Descargar {actividad.nombreArchivo}
                     </a>
+                  )}
+
+                  {actividad.entrega ? (
+                    <div className="mt-3 border-t border-zinc-200 pt-3 text-sm dark:border-zinc-800">
+                      <p className="text-zinc-600 dark:text-zinc-400">
+                        Entregaste: {archivoEntregado?.nombre_archivo}
+                      </p>
+                      {actividad.entrega.comentario_estudiante && (
+                        <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                          Tu comentario: {actividad.entrega.comentario_estudiante}
+                        </p>
+                      )}
+                      {evaluacion ? (
+                        <div className="mt-2">
+                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                            Calificación: {evaluacion.calificacion_final}/10
+                          </p>
+                          {evaluacion.comentarios && (
+                            <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                              {evaluacion.comentarios}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-zinc-500 dark:text-zinc-500">
+                          Pendiente de calificar.
+                        </p>
+                      )}
+                    </div>
+                  ) : estado === "ABIERTA" ? (
+                    <FormularioEntrega actividadId={actividad.id} cursoId={id} />
+                  ) : (
+                    <p className="mt-3 border-t border-zinc-200 pt-3 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-500">
+                      No se puede entregar. {motivoCierre(actividad)}
+                    </p>
                   )}
                 </li>
               );

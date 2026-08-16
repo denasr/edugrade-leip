@@ -19,3 +19,15 @@ export function estadoActividad(actividad: Actividad): "ABIERTA" | "CERRADA" {
 
   return "ABIERTA";
 }
+
+// Explica por qué una actividad CERRADA no admite entregas.
+export function motivoCierre(actividad: Actividad): string | null {
+  if (estadoActividad(actividad) === "ABIERTA") return null;
+  if (actividad.bloqueado_manual) return "Bloqueada por el docente.";
+
+  const ahora = Date.now();
+  if (actividad.fecha_apertura && ahora < new Date(actividad.fecha_apertura).getTime()) {
+    return `Abre el ${new Date(actividad.fecha_apertura).toLocaleString("es-MX")}.`;
+  }
+  return `Cerró el ${new Date(actividad.fecha_cierre).toLocaleString("es-MX")}.`;
+}

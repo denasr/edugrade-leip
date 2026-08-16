@@ -45,6 +45,29 @@ export default async function DetalleCursoDocente({
     .eq("tipo", "TAREA")
     .order("created_at", { ascending: false });
 
+  const actividadIds = (actividades ?? []).map((a) => a.id);
+  const { data: entregas } =
+    actividadIds.length > 0
+      ? await supabase
+          .from("entregas")
+          .select("actividad_id, estado")
+          .in("actividad_id", actividadIds)
+      : { data: [] };
+
+  const conteosPorActividad = new Map<
+    string,
+    { total: number; pendientes: number }
+  >();
+  for (const entrega of entregas ?? []) {
+    const actual = conteosPorActividad.get(entrega.actividad_id) ?? {
+      total: 0,
+      pendientes: 0,
+    };
+    actual.total += 1;
+    if (entrega.estado === "PENDIENTE") actual.pendientes += 1;
+    conteosPorActividad.set(entrega.actividad_id, actual);
+  }
+
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
       <div className="w-full max-w-sm text-center">
@@ -80,6 +103,10 @@ export default async function DetalleCursoDocente({
           <ul className="mt-4 flex flex-col gap-3">
             {actividades.map((actividad) => {
               const estado = estadoActividad(actividad);
+              const conteo = conteosPorActividad.get(actividad.id) ?? {
+                total: 0,
+                pendientes: 0,
+              };
               const alternarBloqueoAction = alternarBloqueo.bind(
                 null,
                 curso.id,
@@ -98,9 +125,12 @@ export default async function DetalleCursoDocente({
                   className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                    <Link
+                      href={`/docente/actividades/${actividad.id}`}
+                      className="font-medium text-zinc-900 hover:underline dark:text-zinc-50"
+                    >
                       {actividad.titulo}
-                    </p>
+                    </Link>
                     <span
                       className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${
                         estado === "ABIERTA"
@@ -111,6 +141,13 @@ export default async function DetalleCursoDocente({
                       {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
                     </span>
                   </div>
+
+                  <Link
+                    href={`/docente/actividades/${actividad.id}`}
+                    className="mt-1 inline-block text-xs text-zinc-500 hover:underline dark:text-zinc-500"
+                  >
+                    {conteo.total} entregas · {conteo.pendientes} pendientes
+                  </Link>
 
                   {actividad.instrucciones && (
                     <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
