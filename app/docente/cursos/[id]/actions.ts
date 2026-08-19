@@ -454,34 +454,56 @@ export async function editarExamen(
     return { error: errorUpdate.message };
   }
 
-  // Reemplaza el set completo de preguntas: más simple y robusto que
-  // diferenciar altas/bajas/modificaciones, y consistente con el cascade
-  // que ya tiene respuestas_examen.pregunta_id hacia preguntas_examen.
+  // Reemplaza el set completo de preguntas solo si de verdad cambió algo:
+  // más simple y robusto que diferenciar altas/bajas/modificaciones
+  // individualmente, pero sin destruir respuestas_examen (por el cascade
+  // hacia preguntas_examen) cuando la edición no tocó las preguntas —
+  // p. ej. si el docente solo cambió la ponderación.
   const admin = createAdminClient();
-  const { error: errorBorrar } = await admin
+  const { data: preguntasActuales } = await admin
     .from("preguntas_examen")
-    .delete()
-    .eq("actividad_id", actividadId);
+    .select("enunciado, opciones, correcta, puntos")
+    .eq("actividad_id", actividadId)
+    .order("orden", { ascending: true });
 
-  if (errorBorrar) {
-    return { error: errorBorrar.message };
-  }
+  const sinCambios =
+    (preguntasActuales ?? []).length === preguntasNormalizadas.length &&
+    (preguntasActuales ?? []).every((actual, i) => {
+      const nueva = preguntasNormalizadas[i];
+      return (
+        actual.enunciado === nueva.enunciado &&
+        actual.correcta === nueva.correcta &&
+        actual.puntos === nueva.puntos &&
+        JSON.stringify(actual.opciones) === JSON.stringify(nueva.opciones)
+      );
+    });
 
-  const { error: errorPreguntas } = await admin
-    .from("preguntas_examen")
-    .insert(
-      preguntasNormalizadas.map((p, i) => ({
-        actividad_id: actividadId,
-        enunciado: p.enunciado,
-        opciones: p.opciones,
-        correcta: p.correcta,
-        puntos: p.puntos,
-        orden: i,
-      }))
-    );
+  if (!sinCambios) {
+    const { error: errorBorrar } = await admin
+      .from("preguntas_examen")
+      .delete()
+      .eq("actividad_id", actividadId);
 
-  if (errorPreguntas) {
-    return { error: errorPreguntas.message };
+    if (errorBorrar) {
+      return { error: errorBorrar.message };
+    }
+
+    const { error: errorPreguntas } = await admin
+      .from("preguntas_examen")
+      .insert(
+        preguntasNormalizadas.map((p, i) => ({
+          actividad_id: actividadId,
+          enunciado: p.enunciado,
+          opciones: p.opciones,
+          correcta: p.correcta,
+          puntos: p.puntos,
+          orden: i,
+        }))
+      );
+
+    if (errorPreguntas) {
+      return { error: errorPreguntas.message };
+    }
   }
 
   revalidatePath(`/docente/cursos/${cursoId}`);
