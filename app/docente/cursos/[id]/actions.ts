@@ -107,6 +107,118 @@ export async function crearActividad(
   return { error: null };
 }
 
+export async function editarActividad(
+  cursoId: string,
+  actividadId: string,
+  _estadoPrevio: EstadoActividad,
+  formData: FormData
+): Promise<EstadoActividad> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  const instrucciones = String(formData.get("instrucciones") ?? "").trim();
+  const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
+  const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
+  const ponderacion = String(formData.get("ponderacion") ?? "").trim();
+  const archivo = formData.get("archivo");
+  const quitarMaterial = formData.get("quitar_material") === "on";
+
+  if (!titulo || !fechaCierre || !ponderacion) {
+    return {
+      error: "Título, fecha de cierre y ponderación son obligatorios.",
+    };
+  }
+
+  const tieneArchivoNuevo = archivo instanceof File && archivo.size > 0;
+  const archivoFile = tieneArchivoNuevo ? (archivo as File) : null;
+
+  if (archivoFile) {
+    if (!TIPOS_PERMITIDOS.includes(archivoFile.type)) {
+      return { error: "Formato no permitido. Usa PDF, DOCX, JPG o PNG." };
+    }
+    if (archivoFile.size > TAMANO_MAXIMO_BYTES) {
+      return { error: "El archivo supera el máximo de 10 MB." };
+    }
+  }
+
+  // RLS (actividades_update_docente) ya restringe esto al docente dueño del
+  // curso, incluso si la actividad ya tiene entregas.
+  const { error: errorUpdate } = await supabase
+    .from("actividades")
+    .update({
+      titulo,
+      instrucciones: instrucciones || null,
+      fecha_apertura: fechaApertura || null,
+      fecha_cierre: fechaCierre,
+      ponderacion: Number(ponderacion),
+    })
+    .eq("id", actividadId);
+
+  if (errorUpdate) {
+    return { error: errorUpdate.message };
+  }
+
+  if (archivoFile || quitarMaterial) {
+    const { data: materialesActuales } = await supabase
+      .from("materiales_actividad")
+      .select("id, storage_path")
+      .eq("actividad_id", actividadId);
+
+    if (materialesActuales && materialesActuales.length > 0) {
+      await supabase.storage
+        .from("materiales-actividades")
+        .remove(materialesActuales.map((m) => m.storage_path));
+      await supabase
+        .from("materiales_actividad")
+        .delete()
+        .in(
+          "id",
+          materialesActuales.map((m) => m.id)
+        );
+    }
+
+    if (archivoFile) {
+      const storagePath = `${cursoId}/${actividadId}/${archivoFile.name}`;
+
+      const { error: errorSubida } = await supabase.storage
+        .from("materiales-actividades")
+        .upload(storagePath, archivoFile, { contentType: archivoFile.type });
+
+      if (errorSubida) {
+        return {
+          error: `No se pudo subir el archivo: ${errorSubida.message}`,
+        };
+      }
+
+      const { error: errorMaterial } = await supabase
+        .from("materiales_actividad")
+        .insert({
+          actividad_id: actividadId,
+          nombre_archivo: archivoFile.name,
+          storage_path: storagePath,
+          tamano_bytes: archivoFile.size,
+        });
+
+      if (errorMaterial) {
+        await supabase.storage
+          .from("materiales-actividades")
+          .remove([storagePath]);
+        return { error: errorMaterial.message };
+      }
+    }
+  }
+
+  revalidatePath(`/docente/cursos/${cursoId}`);
+  return { error: null };
+}
+
 export async function alternarBloqueo(
   cursoId: string,
   actividadId: string,
@@ -242,6 +354,133 @@ export async function crearExamen(
 
   if (errorPreguntas) {
     await supabase.from("actividades").delete().eq("id", actividad.id);
+    return { error: errorPreguntas.message };
+  }
+
+  revalidatePath(`/docente/cursos/${cursoId}`);
+  return { error: null };
+}
+
+export async function editarExamen(
+  cursoId: string,
+  actividadId: string,
+  _estadoPrevio: EstadoActividad,
+  formData: FormData
+): Promise<EstadoActividad> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  // Verifica, vía el propio dato de la actividad (no el parámetro recibido),
+  // que quien llama es el docente dueño del curso al que pertenece. Solo
+  // después de esto se usa la secret key para tocar preguntas_examen.
+  const { data: actividadActual } = (await supabase
+    .from("actividades")
+    .select("curso_id, cursos(docente_id)")
+    .eq("id", actividadId)
+    .single()) as {
+    data: { curso_id: string; cursos: { docente_id: string } | null } | null;
+  };
+
+  if (!actividadActual || actividadActual.cursos?.docente_id !== user.id) {
+    return { error: "No tienes permiso sobre esta actividad." };
+  }
+
+  const titulo = String(formData.get("titulo") ?? "").trim();
+  const instrucciones = String(formData.get("instrucciones") ?? "").trim();
+  const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
+  const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
+  const ponderacion = String(formData.get("ponderacion") ?? "").trim();
+  const preguntasJson = String(formData.get("preguntas") ?? "");
+
+  if (!titulo || !fechaCierre || !ponderacion) {
+    return {
+      error: "Título, fecha de cierre y ponderación son obligatorios.",
+    };
+  }
+
+  let preguntas: PreguntaEntrada[];
+  try {
+    preguntas = JSON.parse(preguntasJson);
+  } catch {
+    return { error: "No se pudieron leer las preguntas." };
+  }
+
+  if (!Array.isArray(preguntas) || preguntas.length === 0) {
+    return { error: "Agrega al menos una pregunta." };
+  }
+
+  const preguntasNormalizadas = preguntas.map((p) => ({
+    enunciado: String(p.enunciado ?? "").trim(),
+    opciones: (p.opciones ?? []).map((o) => String(o).trim()),
+    correcta: String(p.correcta ?? "").trim(),
+    puntos: Number(p.puntos),
+  }));
+
+  for (const [i, p] of preguntasNormalizadas.entries()) {
+    if (!p.enunciado) {
+      return { error: `La pregunta ${i + 1} necesita un enunciado.` };
+    }
+    if (p.opciones.length !== 4 || p.opciones.some((o) => !o)) {
+      return { error: `La pregunta ${i + 1} necesita 4 opciones no vacías.` };
+    }
+    if (!p.opciones.includes(p.correcta)) {
+      return {
+        error: `La pregunta ${i + 1} necesita marcar cuál opción es correcta.`,
+      };
+    }
+    if (!Number.isFinite(p.puntos) || p.puntos <= 0) {
+      return { error: `La pregunta ${i + 1} necesita puntos mayores a 0.` };
+    }
+  }
+
+  const { error: errorUpdate } = await supabase
+    .from("actividades")
+    .update({
+      titulo,
+      instrucciones: instrucciones || null,
+      fecha_apertura: fechaApertura || null,
+      fecha_cierre: fechaCierre,
+      ponderacion: Number(ponderacion),
+    })
+    .eq("id", actividadId);
+
+  if (errorUpdate) {
+    return { error: errorUpdate.message };
+  }
+
+  // Reemplaza el set completo de preguntas: más simple y robusto que
+  // diferenciar altas/bajas/modificaciones, y consistente con el cascade
+  // que ya tiene respuestas_examen.pregunta_id hacia preguntas_examen.
+  const admin = createAdminClient();
+  const { error: errorBorrar } = await admin
+    .from("preguntas_examen")
+    .delete()
+    .eq("actividad_id", actividadId);
+
+  if (errorBorrar) {
+    return { error: errorBorrar.message };
+  }
+
+  const { error: errorPreguntas } = await admin
+    .from("preguntas_examen")
+    .insert(
+      preguntasNormalizadas.map((p, i) => ({
+        actividad_id: actividadId,
+        enunciado: p.enunciado,
+        opciones: p.opciones,
+        correcta: p.correcta,
+        puntos: p.puntos,
+        orden: i,
+      }))
+    );
+
+  if (errorPreguntas) {
     return { error: errorPreguntas.message };
   }
 

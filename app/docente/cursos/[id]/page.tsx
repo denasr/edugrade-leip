@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { estadoActividad, compararPorCierre, textoRelativoCierre } from "@/lib/actividades";
-import { IconoArchivo } from "@/lib/icono-archivo";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { compararPorCierre } from "@/lib/actividades";
 import FormularioActividad from "./formulario-actividad";
 import FormularioCrearExamen from "./formulario-crear-examen";
-import BotonEliminarActividad from "./boton-eliminar-actividad";
-import { alternarBloqueo, eliminarActividad } from "./actions";
+import TarjetaTarea from "./tarjeta-tarea";
+import TarjetaExamen from "./tarjeta-examen";
 
 export default async function DetalleCursoDocente({
   params,
@@ -119,6 +119,33 @@ export default async function DetalleCursoDocente({
     statsPorExamen.set(entrega.actividad_id, actual);
   }
 
+  // Precarga las preguntas (con `correcta`) para el formulario de edición.
+  // Solo llega a este punto quien ya se confirmó como docente dueño del
+  // curso más arriba, así que es seguro usar la secret key aquí.
+  type PreguntaConCorrecta = {
+    actividad_id: string;
+    enunciado: string;
+    opciones: string[];
+    correcta: string;
+    puntos: number;
+  };
+
+  const preguntasPorExamen = new Map<string, PreguntaConCorrecta[]>();
+  if (examenIds.length > 0) {
+    const admin = createAdminClient();
+    const { data: preguntas } = await admin
+      .from("preguntas_examen")
+      .select("actividad_id, enunciado, opciones, correcta, puntos")
+      .in("actividad_id", examenIds)
+      .order("orden", { ascending: true });
+
+    for (const pregunta of (preguntas ?? []) as PreguntaConCorrecta[]) {
+      const actual = preguntasPorExamen.get(pregunta.actividad_id) ?? [];
+      actual.push(pregunta);
+      preguntasPorExamen.set(pregunta.actividad_id, actual);
+    }
+  }
+
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
       <div className="w-full max-w-sm text-center">
@@ -145,98 +172,19 @@ export default async function DetalleCursoDocente({
           </p>
         ) : (
           <ul className="mt-4 flex flex-col gap-3">
-            {actividades.map((actividad) => {
-              const estado = estadoActividad(actividad);
-              const conteo = conteosPorActividad.get(actividad.id) ?? {
-                total: 0,
-                pendientes: 0,
-              };
-              const alternarBloqueoAction = alternarBloqueo.bind(
-                null,
-                curso.id,
-                actividad.id,
-                !actividad.bloqueado_manual
-              );
-              const eliminarActividadAction = eliminarActividad.bind(
-                null,
-                curso.id,
-                actividad.id
-              );
-
-              return (
-                <li key={actividad.id} className="card p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <Link
-                      href={`/docente/actividades/${actividad.id}`}
-                      className="font-medium text-ink hover:underline"
-                    >
-                      {actividad.titulo}
-                    </Link>
-                    <span
-                      className={
-                        estado === "ABIERTA"
-                          ? "badge-abierta"
-                          : "badge-cerrada"
-                      }
-                    >
-                      {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
-                    </span>
-                  </div>
-
-                  <Link
-                    href={`/docente/actividades/${actividad.id}`}
-                    className="mt-1 inline-block text-xs text-ink/50 hover:underline"
-                  >
-                    {conteo.total} entregas · {conteo.pendientes} pendientes
-                  </Link>
-
-                  {actividad.instrucciones && (
-                    <p className="mt-1 text-sm text-ink/70">
-                      {actividad.instrucciones}
-                    </p>
-                  )}
-
-                  <p className="mt-2 text-xs text-ink/50">
-                    {actividad.fecha_apertura
-                      ? `Abre ${new Date(
-                          actividad.fecha_apertura
-                        ).toLocaleString("es-MX")} · `
-                      : ""}
-                    Cierra{" "}
-                    {new Date(actividad.fecha_cierre).toLocaleString("es-MX")}
-                    {" ("}
-                    {textoRelativoCierre(actividad.fecha_cierre)}
-                    {") · "}
-                    Ponderación {actividad.ponderacion}
-                  </p>
-
-                  {actividad.materiales_actividad.length > 0 && (
-                    <p className="mt-1 flex items-center gap-1.5 text-xs text-ink/50">
-                      <IconoArchivo
-                        nombreArchivo={
-                          actividad.materiales_actividad[0].nombre_archivo
-                        }
-                      />
-                      Material: {actividad.materiales_actividad[0].nombre_archivo}
-                    </p>
-                  )}
-
-                  <div className="mt-3 flex items-center gap-4">
-                    <form action={alternarBloqueoAction}>
-                      <button type="submit" className="link-muted">
-                        {actividad.bloqueado_manual
-                          ? "Desbloquear"
-                          : "Bloquear"}
-                      </button>
-                    </form>
-                    <BotonEliminarActividad
-                      accion={eliminarActividadAction}
-                      titulo={actividad.titulo}
-                    />
-                  </div>
-                </li>
-              );
-            })}
+            {actividades.map((actividad) => (
+              <TarjetaTarea
+                key={actividad.id}
+                actividad={actividad}
+                cursoId={curso.id}
+                conteo={
+                  conteosPorActividad.get(actividad.id) ?? {
+                    total: 0,
+                    pendientes: 0,
+                  }
+                }
+              />
+            ))}
           </ul>
         )}
       </section>
@@ -252,82 +200,21 @@ export default async function DetalleCursoDocente({
           </p>
         ) : (
           <ul className="mt-4 flex flex-col gap-3">
-            {examenes.map((examen) => {
-              const estado = estadoActividad(examen);
-              const stats = statsPorExamen.get(examen.id) ?? {
-                presentados: 0,
-                sumaCalif: 0,
-                conCalif: 0,
-              };
-              const promedio =
-                stats.conCalif > 0
-                  ? (stats.sumaCalif / stats.conCalif).toFixed(1)
-                  : "—";
-              const alternarBloqueoAction = alternarBloqueo.bind(
-                null,
-                curso.id,
-                examen.id,
-                !examen.bloqueado_manual
-              );
-              const eliminarActividadAction = eliminarActividad.bind(
-                null,
-                curso.id,
-                examen.id
-              );
-
-              return (
-                <li key={examen.id} className="card p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-ink">{examen.titulo}</p>
-                    <span
-                      className={
-                        estado === "ABIERTA"
-                          ? "badge-abierta"
-                          : "badge-cerrada"
-                      }
-                    >
-                      {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
-                    </span>
-                  </div>
-
-                  <p className="mt-1 text-xs text-ink/50">
-                    {stats.presentados} presentados · promedio {promedio}/10
-                  </p>
-
-                  {examen.instrucciones && (
-                    <p className="mt-1 text-sm text-ink/70">
-                      {examen.instrucciones}
-                    </p>
-                  )}
-
-                  <p className="mt-2 text-xs text-ink/50">
-                    {examen.fecha_apertura
-                      ? `Abre ${new Date(
-                          examen.fecha_apertura
-                        ).toLocaleString("es-MX")} · `
-                      : ""}
-                    Cierra{" "}
-                    {new Date(examen.fecha_cierre).toLocaleString("es-MX")}
-                    {" ("}
-                    {textoRelativoCierre(examen.fecha_cierre)}
-                    {") · "}
-                    Ponderación {examen.ponderacion}
-                  </p>
-
-                  <div className="mt-3 flex items-center gap-4">
-                    <form action={alternarBloqueoAction}>
-                      <button type="submit" className="link-muted">
-                        {examen.bloqueado_manual ? "Desbloquear" : "Bloquear"}
-                      </button>
-                    </form>
-                    <BotonEliminarActividad
-                      accion={eliminarActividadAction}
-                      titulo={examen.titulo}
-                    />
-                  </div>
-                </li>
-              );
-            })}
+            {examenes.map((examen) => (
+              <TarjetaExamen
+                key={examen.id}
+                examen={examen}
+                cursoId={curso.id}
+                stats={
+                  statsPorExamen.get(examen.id) ?? {
+                    presentados: 0,
+                    sumaCalif: 0,
+                    conCalif: 0,
+                  }
+                }
+                preguntas={preguntasPorExamen.get(examen.id) ?? []}
+              />
+            ))}
           </ul>
         )}
       </section>

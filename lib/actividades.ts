@@ -82,6 +82,17 @@ export function textoRelativoCierre(
   return pasado ? `cerró hace ${texto}` : `cierra en ${texto}`;
 }
 
+// Convierte una fecha guardada (ISO, timestamptz) al formato que espera un
+// <input type="datetime-local"> para precargarlo, en hora local del navegador.
+export function fechaParaInput(fechaIso: string | null): string {
+  if (!fechaIso) return "";
+  const d = new Date(fechaIso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
 // Comparador para ordenar actividades por cercanía a su fecha_cierre:
 // abiertas primero (la más próxima primero), cerradas al final (la más
 // recientemente cerrada primero).

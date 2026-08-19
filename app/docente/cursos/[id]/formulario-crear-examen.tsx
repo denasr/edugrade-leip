@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { crearExamen } from "./actions";
+import { crearExamen, editarExamen } from "./actions";
 import type { EstadoActividad } from "./actions";
+import { fechaParaInput } from "@/lib/actividades";
 import { useToast } from "../../../toast-provider";
 
 type PreguntaForm = {
@@ -16,36 +17,80 @@ function preguntaVacia(): PreguntaForm {
   return { enunciado: "", opciones: ["", "", "", ""], correcta: 0, puntos: 5 };
 }
 
+type PreguntaExistente = {
+  enunciado: string;
+  opciones: string[];
+  correcta: string;
+  puntos: number;
+};
+
+type ExamenExistente = {
+  id: string;
+  titulo: string;
+  instrucciones: string | null;
+  fecha_apertura: string | null;
+  fecha_cierre: string;
+  ponderacion: number;
+  preguntas: PreguntaExistente[];
+};
+
+function preguntasIniciales(examenExistente?: ExamenExistente): PreguntaForm[] {
+  if (!examenExistente || examenExistente.preguntas.length === 0) {
+    return [preguntaVacia()];
+  }
+  return examenExistente.preguntas.map((p) => ({
+    enunciado: p.enunciado,
+    opciones: [p.opciones[0] ?? "", p.opciones[1] ?? "", p.opciones[2] ?? "", p.opciones[3] ?? ""],
+    correcta: Math.max(0, p.opciones.indexOf(p.correcta)),
+    puntos: p.puntos,
+  }));
+}
+
 const estadoInicial: EstadoActividad = { error: null };
 
 export default function FormularioCrearExamen({
   cursoId,
+  examenExistente,
+  tieneRespuestas = false,
+  onCancelar,
 }: {
   cursoId: string;
+  examenExistente?: ExamenExistente;
+  tieneRespuestas?: boolean;
+  onCancelar?: () => void;
 }) {
   const { mostrar } = useToast();
   const [abierto, setAbierto] = useState(false);
-  const [preguntas, setPreguntas] = useState<PreguntaForm[]>([
-    preguntaVacia(),
-  ]);
+  const [preguntas, setPreguntas] = useState<PreguntaForm[]>(
+    preguntasIniciales(examenExistente)
+  );
   const formRef = useRef<HTMLFormElement>(null);
+  const editando = Boolean(examenExistente);
 
-  async function crearExamenConAviso(
+  async function guardarConAviso(
     prevState: EstadoActividad,
     formData: FormData
   ): Promise<EstadoActividad> {
-    const resultado = await crearExamen(cursoId, prevState, formData);
+    const resultado = examenExistente
+      ? await editarExamen(cursoId, examenExistente.id, prevState, formData)
+      : await crearExamen(cursoId, prevState, formData);
+
     if (!resultado.error) {
       formRef.current?.reset();
-      setPreguntas([preguntaVacia()]);
-      setAbierto(false);
-      mostrar("Examen creado.");
+      if (editando) {
+        onCancelar?.();
+        mostrar("Examen actualizado.");
+      } else {
+        setPreguntas([preguntaVacia()]);
+        setAbierto(false);
+        mostrar("Examen creado.");
+      }
     }
     return resultado;
   }
 
   const [state, formAction, pending] = useActionState(
-    crearExamenConAviso,
+    guardarConAviso,
     estadoInicial
   );
 
@@ -74,6 +119,14 @@ export default function FormularioCrearExamen({
     setPreguntas((actual) => actual.filter((_, i) => i !== indice));
   }
 
+  function cancelar() {
+    if (editando) {
+      onCancelar?.();
+    } else {
+      setAbierto(false);
+    }
+  }
+
   const preguntasJson = JSON.stringify(
     preguntas.map((p) => ({
       enunciado: p.enunciado,
@@ -83,7 +136,7 @@ export default function FormularioCrearExamen({
     }))
   );
 
-  if (!abierto) {
+  if (!editando && !abierto) {
     return (
       <button
         type="button"
@@ -97,22 +150,40 @@ export default function FormularioCrearExamen({
 
   return (
     <form ref={formRef} action={formAction} className="card w-full max-w-sm p-6">
-      <h2 className="font-title text-xl text-verde-bosque">Nuevo examen</h2>
+      <h2 className="font-title text-xl text-verde-bosque">
+        {editando ? "Editar examen" : "Nuevo examen"}
+      </h2>
 
       <div className="mt-4 flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm text-ink/80">
           Título
-          <input type="text" name="titulo" required className="input" />
+          <input
+            type="text"
+            name="titulo"
+            required
+            defaultValue={examenExistente?.titulo}
+            className="input"
+          />
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-ink/80">
           Instrucciones
-          <textarea name="instrucciones" rows={2} className="input" />
+          <textarea
+            name="instrucciones"
+            rows={2}
+            defaultValue={examenExistente?.instrucciones ?? ""}
+            className="input"
+          />
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-ink/80">
           Fecha de apertura (opcional)
-          <input type="datetime-local" name="fecha_apertura" className="input" />
+          <input
+            type="datetime-local"
+            name="fecha_apertura"
+            defaultValue={fechaParaInput(examenExistente?.fecha_apertura ?? null)}
+            className="input"
+          />
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-ink/80">
@@ -121,6 +192,11 @@ export default function FormularioCrearExamen({
             type="datetime-local"
             name="fecha_cierre"
             required
+            defaultValue={
+              examenExistente
+                ? fechaParaInput(examenExistente.fecha_cierre)
+                : undefined
+            }
             className="input"
           />
         </label>
@@ -133,10 +209,18 @@ export default function FormularioCrearExamen({
             required
             min={0}
             step="any"
-            defaultValue={10}
+            defaultValue={examenExistente?.ponderacion ?? 10}
             className="input"
           />
         </label>
+
+        {editando && tieneRespuestas && (
+          <p className="rounded-lg bg-terracota/10 p-3 text-sm text-terracota">
+            Este examen ya tiene respuestas de estudiantes. Si cambias las
+            preguntas, quienes ya presentaron verán una versión distinta a la
+            que contestaron.
+          </p>
+        )}
 
         <div className="flex flex-col gap-3 border-t border-verde-bosque/15 pt-3">
           <p className="text-sm font-medium text-ink/80">Preguntas</p>
@@ -235,13 +319,13 @@ export default function FormularioCrearExamen({
 
         <div className="mt-2 flex items-center gap-3">
           <button type="submit" disabled={pending} className="btn-primary">
-            {pending ? "Creando…" : "Crear examen"}
+            {pending
+              ? "Guardando…"
+              : editando
+                ? "Guardar cambios"
+                : "Crear examen"}
           </button>
-          <button
-            type="button"
-            onClick={() => setAbierto(false)}
-            className="link-muted"
-          >
+          <button type="button" onClick={cancelar} className="link-muted">
             Cancelar
           </button>
         </div>
