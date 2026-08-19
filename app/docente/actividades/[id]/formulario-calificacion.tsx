@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { calificarEntrega, type EstadoCalificacion } from "./actions";
+import { useToast } from "../../../toast-provider";
 
 const estadoInicial: EstadoCalificacion = { error: null };
 
@@ -16,13 +17,26 @@ export default function FormularioCalificacion({
   notaActual: number | null;
   comentarioActual: string | null;
 }) {
-  const calificarEstaEntrega = calificarEntrega.bind(
-    null,
-    actividadId,
-    entregaId
-  );
+  const { mostrar } = useToast();
+
+  async function calificarConAviso(
+    prevState: EstadoCalificacion,
+    formData: FormData
+  ): Promise<EstadoCalificacion> {
+    const resultado = await calificarEntrega(
+      actividadId,
+      entregaId,
+      prevState,
+      formData
+    );
+    if (!resultado.error) {
+      mostrar("Calificación guardada.");
+    }
+    return resultado;
+  }
+
   const [state, formAction, pending] = useActionState(
-    calificarEstaEntrega,
+    calificarConAviso,
     estadoInicial
   );
 

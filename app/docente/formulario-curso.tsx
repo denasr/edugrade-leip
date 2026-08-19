@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { crearCurso, type EstadoCrearCurso } from "./actions";
+import { useToast } from "../toast-provider";
 
 function generarClaveAcceso() {
   // sin 0/O ni 1/I/L, para que no se confundan al copiarla a mano
@@ -16,13 +17,10 @@ function generarClaveAcceso() {
 const estadoInicial: EstadoCrearCurso = { error: null };
 
 export default function FormularioCurso() {
-  const [state, formAction, pending] = useActionState(
-    crearCurso,
-    estadoInicial
-  );
+  const { mostrar } = useToast();
+  const [abierto, setAbierto] = useState(false);
   const [claveAcceso, setClaveAcceso] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
-  const primerRender = useRef(true);
 
   // Generada en el cliente para no chocar con el HTML del server durante la
   // hidratación (Math.random() daría valores distintos en cada lado).
@@ -30,16 +28,36 @@ export default function FormularioCurso() {
     setClaveAcceso(generarClaveAcceso());
   }, []);
 
-  useEffect(() => {
-    if (primerRender.current) {
-      primerRender.current = false;
-      return;
-    }
-    if (!pending && state.error === null) {
+  async function crearCursoConAviso(
+    prevState: EstadoCrearCurso,
+    formData: FormData
+  ): Promise<EstadoCrearCurso> {
+    const resultado = await crearCurso(prevState, formData);
+    if (!resultado.error) {
       formRef.current?.reset();
       setClaveAcceso(generarClaveAcceso());
+      setAbierto(false);
+      mostrar("Curso creado.");
     }
-  }, [state, pending]);
+    return resultado;
+  }
+
+  const [state, formAction, pending] = useActionState(
+    crearCursoConAviso,
+    estadoInicial
+  );
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="btn-primary w-full max-w-sm"
+      >
+        + Nuevo curso
+      </button>
+    );
+  }
 
   return (
     <form ref={formRef} action={formAction} className="card w-full max-w-sm p-6">
@@ -75,9 +93,18 @@ export default function FormularioCurso() {
 
         {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
-        <button type="submit" disabled={pending} className="btn-primary mt-2">
-          {pending ? "Creando…" : "Crear curso"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button type="submit" disabled={pending} className="btn-primary">
+            {pending ? "Creando…" : "Crear curso"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAbierto(false)}
+            className="link-muted"
+          >
+            Cancelar
+          </button>
+        </div>
       </div>
     </form>
   );

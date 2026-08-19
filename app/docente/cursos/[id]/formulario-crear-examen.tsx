@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { crearExamen } from "./actions";
 import type { EstadoActividad } from "./actions";
+import { useToast } from "../../../toast-provider";
 
 type PreguntaForm = {
   enunciado: string;
@@ -22,27 +23,31 @@ export default function FormularioCrearExamen({
 }: {
   cursoId: string;
 }) {
-  const crearExamenDelCurso = crearExamen.bind(null, cursoId);
-  const [state, formAction, pending] = useActionState(
-    crearExamenDelCurso,
-    estadoInicial
-  );
+  const { mostrar } = useToast();
+  const [abierto, setAbierto] = useState(false);
   const [preguntas, setPreguntas] = useState<PreguntaForm[]>([
     preguntaVacia(),
   ]);
   const formRef = useRef<HTMLFormElement>(null);
-  const primerRender = useRef(true);
 
-  useEffect(() => {
-    if (primerRender.current) {
-      primerRender.current = false;
-      return;
-    }
-    if (!pending && state.error === null) {
+  async function crearExamenConAviso(
+    prevState: EstadoActividad,
+    formData: FormData
+  ): Promise<EstadoActividad> {
+    const resultado = await crearExamen(cursoId, prevState, formData);
+    if (!resultado.error) {
       formRef.current?.reset();
       setPreguntas([preguntaVacia()]);
+      setAbierto(false);
+      mostrar("Examen creado.");
     }
-  }, [state, pending]);
+    return resultado;
+  }
+
+  const [state, formAction, pending] = useActionState(
+    crearExamenConAviso,
+    estadoInicial
+  );
 
   function actualizarPregunta(indice: number, cambios: Partial<PreguntaForm>) {
     setPreguntas((actual) =>
@@ -77,6 +82,18 @@ export default function FormularioCrearExamen({
       puntos: p.puntos,
     }))
   );
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="btn-primary w-full max-w-sm"
+      >
+        + Nuevo examen
+      </button>
+    );
+  }
 
   return (
     <form ref={formRef} action={formAction} className="card w-full max-w-sm p-6">
@@ -216,9 +233,18 @@ export default function FormularioCrearExamen({
 
         {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
-        <button type="submit" disabled={pending} className="btn-primary mt-2">
-          {pending ? "Creando…" : "Crear examen"}
-        </button>
+        <div className="mt-2 flex items-center gap-3">
+          <button type="submit" disabled={pending} className="btn-primary">
+            {pending ? "Creando…" : "Crear examen"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAbierto(false)}
+            className="link-muted"
+          >
+            Cancelar
+          </button>
+        </div>
       </div>
     </form>
   );

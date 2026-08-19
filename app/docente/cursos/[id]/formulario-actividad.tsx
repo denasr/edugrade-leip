@@ -1,30 +1,35 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import { crearActividad, type EstadoActividad } from "./actions";
+import { useToast } from "../../../toast-provider";
 
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
 
 const estadoInicial: EstadoActividad = { error: null };
 
 export default function FormularioActividad({ cursoId }: { cursoId: string }) {
-  const crearActividadDelCurso = crearActividad.bind(null, cursoId);
+  const { mostrar } = useToast();
+  const [abierto, setAbierto] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  async function crearActividadConAviso(
+    prevState: EstadoActividad,
+    formData: FormData
+  ): Promise<EstadoActividad> {
+    const resultado = await crearActividad(cursoId, prevState, formData);
+    if (!resultado.error) {
+      formRef.current?.reset();
+      setAbierto(false);
+      mostrar("Tarea creada.");
+    }
+    return resultado;
+  }
+
   const [state, formAction, pending] = useActionState(
-    crearActividadDelCurso,
+    crearActividadConAviso,
     estadoInicial
   );
-  const formRef = useRef<HTMLFormElement>(null);
-  const primerRender = useRef(true);
-
-  useEffect(() => {
-    if (primerRender.current) {
-      primerRender.current = false;
-      return;
-    }
-    if (!pending && state.error === null) {
-      formRef.current?.reset();
-    }
-  }, [state, pending]);
 
   function validarArchivo(e: React.FormEvent<HTMLFormElement>) {
     const input = formRef.current?.elements.namedItem(
@@ -35,6 +40,18 @@ export default function FormularioActividad({ cursoId }: { cursoId: string }) {
       e.preventDefault();
       alert("El archivo supera el máximo de 10 MB.");
     }
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="btn-primary w-full max-w-sm"
+      >
+        + Nueva tarea
+      </button>
+    );
   }
 
   return (
@@ -100,9 +117,18 @@ export default function FormularioActividad({ cursoId }: { cursoId: string }) {
 
         {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
-        <button type="submit" disabled={pending} className="btn-primary mt-2">
-          {pending ? "Creando…" : "Crear tarea"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button type="submit" disabled={pending} className="btn-primary">
+            {pending ? "Creando…" : "Crear tarea"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAbierto(false)}
+            className="link-muted"
+          >
+            Cancelar
+          </button>
+        </div>
       </div>
     </form>
   );

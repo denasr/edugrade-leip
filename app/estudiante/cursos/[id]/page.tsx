@@ -1,7 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { estadoActividad, motivoCierre } from "@/lib/actividades";
+import {
+  estadoActividad,
+  motivoCierre,
+  compararPorCierre,
+  textoRelativoCierre,
+} from "@/lib/actividades";
+import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioEntrega from "./formulario-entrega";
 import FormularioPresentarExamen from "./formulario-presentar-examen";
 
@@ -51,6 +57,8 @@ export default async function DetalleCursoEstudiante({
     .eq("curso_id", id)
     .eq("tipo", "TAREA")
     .order("created_at", { ascending: false });
+
+  actividades?.sort(compararPorCierre);
 
   const actividadIds = (actividades ?? []).map((a) => a.id);
 
@@ -108,6 +116,8 @@ export default async function DetalleCursoEstudiante({
     .eq("curso_id", id)
     .eq("tipo", "EXAMEN")
     .order("created_at", { ascending: false });
+
+  examenes?.sort(compararPorCierre);
 
   const examenIds = (examenes ?? []).map((e) => e.id);
 
@@ -217,22 +227,30 @@ export default async function DetalleCursoEstudiante({
                       : ""}
                     Cierra{" "}
                     {new Date(actividad.fecha_cierre).toLocaleString("es-MX")}
-                    {" · "}
+                    {" ("}
+                    {textoRelativoCierre(actividad.fecha_cierre)}
+                    {") · "}
                     Ponderación {actividad.ponderacion}
                   </p>
 
                   {actividad.enlaceDescarga && (
                     <a
                       href={actividad.enlaceDescarga}
-                      className="mt-2 inline-block text-sm font-medium text-verde-bosque hover:underline"
+                      className="mt-2 flex items-center gap-1.5 text-sm font-medium text-verde-bosque hover:underline"
                     >
+                      <IconoArchivo nombreArchivo={actividad.nombreArchivo ?? ""} />
                       Descargar {actividad.nombreArchivo}
                     </a>
                   )}
 
                   {actividad.entrega ? (
                     <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
-                      <p className="text-ink/70">
+                      <p className="flex items-center gap-1.5 text-ink/70">
+                        {archivoEntregado && (
+                          <IconoArchivo
+                            nombreArchivo={archivoEntregado.nombre_archivo}
+                          />
+                        )}
                         Entregaste: {archivoEntregado?.nombre_archivo}
                       </p>
                       {actividad.entrega.comentario_estudiante && (
@@ -313,7 +331,9 @@ export default async function DetalleCursoEstudiante({
                       : ""}
                     Cierra{" "}
                     {new Date(examen.fecha_cierre).toLocaleString("es-MX")}
-                    {" · "}
+                    {" ("}
+                    {textoRelativoCierre(examen.fecha_cierre)}
+                    {") · "}
                     Ponderación {examen.ponderacion}
                   </p>
 

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioCalificacion from "./formulario-calificacion";
 
 // select("cursos(...)") desde actividades es una relación many-to-one (FK en
@@ -154,8 +155,9 @@ export default async function DetalleActividadDocente({
                   {entrega.enlaceDescarga && (
                     <a
                       href={entrega.enlaceDescarga}
-                      className="mt-2 inline-block text-sm font-medium text-verde-bosque hover:underline"
+                      className="mt-2 flex items-center gap-1.5 text-sm font-medium text-verde-bosque hover:underline"
                     >
+                      <IconoArchivo nombreArchivo={entrega.nombreArchivo ?? ""} />
                       Descargar {entrega.nombreArchivo}
                     </a>
                   )}

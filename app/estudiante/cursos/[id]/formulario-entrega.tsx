@@ -2,6 +2,7 @@
 
 import { useActionState, useRef } from "react";
 import { entregarTarea, type EstadoEntrega } from "./actions";
+import { useToast } from "../../../toast-provider";
 
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
 
@@ -14,12 +15,29 @@ export default function FormularioEntrega({
   actividadId: string;
   cursoId: string;
 }) {
-  const entregarEstaTarea = entregarTarea.bind(null, actividadId, cursoId);
+  const { mostrar } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  async function entregarConAviso(
+    prevState: EstadoEntrega,
+    formData: FormData
+  ): Promise<EstadoEntrega> {
+    const resultado = await entregarTarea(
+      actividadId,
+      cursoId,
+      prevState,
+      formData
+    );
+    if (!resultado.error) {
+      mostrar("Tarea entregada.");
+    }
+    return resultado;
+  }
+
   const [state, formAction, pending] = useActionState(
-    entregarEstaTarea,
+    entregarConAviso,
     estadoInicial
   );
-  const formRef = useRef<HTMLFormElement>(null);
 
   function validarArchivo(e: React.FormEvent<HTMLFormElement>) {
     const input = formRef.current?.elements.namedItem(

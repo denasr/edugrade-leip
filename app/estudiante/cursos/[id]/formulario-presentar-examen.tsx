@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { presentarExamen, type EstadoExamen } from "./actions";
+import { useToast } from "../../../toast-provider";
 
 type Pregunta = {
   id: string;
@@ -21,9 +22,26 @@ export default function FormularioPresentarExamen({
   cursoId: string;
   preguntas: Pregunta[];
 }) {
-  const presentarEsteExamen = presentarExamen.bind(null, actividadId, cursoId);
+  const { mostrar } = useToast();
+
+  async function presentarConAviso(
+    prevState: EstadoExamen,
+    formData: FormData
+  ): Promise<EstadoExamen> {
+    const resultado = await presentarExamen(
+      actividadId,
+      cursoId,
+      prevState,
+      formData
+    );
+    if (!resultado.error) {
+      mostrar("Examen enviado.");
+    }
+    return resultado;
+  }
+
   const [state, formAction, pending] = useActionState(
-    presentarEsteExamen,
+    presentarConAviso,
     estadoInicial
   );
 

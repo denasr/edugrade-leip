@@ -36,15 +36,15 @@ body {
   }
 
   .btn-primary {
-    @apply rounded-full bg-verde-bosque px-5 py-2 text-sm font-medium text-crema transition-colors hover:bg-verde-bosque/90 disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center rounded-full bg-verde-bosque px-5 py-2.5 text-sm font-medium text-crema transition-colors hover:bg-verde-bosque/90 disabled:opacity-50;
   }
 
   .btn-accent {
-    @apply rounded-full bg-terracota px-5 py-2 text-sm font-medium text-crema transition-colors hover:bg-terracota/90 disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center rounded-full bg-terracota px-5 py-2.5 text-sm font-medium text-crema transition-colors hover:bg-terracota/90 disabled:opacity-50;
   }
 
   .btn-text-accent {
-    @apply text-sm font-medium text-terracota transition-colors hover:text-terracota/80;
+    @apply inline-flex min-h-11 items-center px-1 text-sm font-medium text-terracota transition-colors hover:text-terracota/80;
   }
 
   .input {
@@ -52,7 +52,7 @@ body {
   }
 
   .link-muted {
-    @apply text-sm text-ink/60 transition-colors hover:text-verde-bosque hover:underline;
+    @apply inline-flex min-h-11 items-center px-1 text-sm text-ink/60 transition-colors hover:text-verde-bosque hover:underline;
   }
 
   .clave-acceso {
@@ -73,5 +73,9 @@ body {
 
   .badge-calificado {
     @apply inline-block shrink-0 rounded-full bg-calificado/10 px-2.5 py-0.5 text-xs font-medium text-calificado;
+  }
+
+  .toast {
+    @apply pointer-events-auto rounded-full bg-verde-bosque px-4 py-2 text-center text-sm font-medium text-crema shadow-lg shadow-verde-bosque/20;
   }
 }

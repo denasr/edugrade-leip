@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { estadoActividad } from "@/lib/actividades";
+import { estadoActividad, compararPorCierre, textoRelativoCierre } from "@/lib/actividades";
+import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioActividad from "./formulario-actividad";
 import FormularioCrearExamen from "./formulario-crear-examen";
 import BotonEliminarActividad from "./boton-eliminar-actividad";
@@ -46,6 +47,8 @@ export default async function DetalleCursoDocente({
     .eq("tipo", "TAREA")
     .order("created_at", { ascending: false });
 
+  actividades?.sort(compararPorCierre);
+
   const actividadIds = (actividades ?? []).map((a) => a.id);
   const { data: entregas } =
     actividadIds.length > 0
@@ -77,6 +80,8 @@ export default async function DetalleCursoDocente({
     .eq("curso_id", id)
     .eq("tipo", "EXAMEN")
     .order("created_at", { ascending: false });
+
+  examenes?.sort(compararPorCierre);
 
   const examenIds = (examenes ?? []).map((e) => e.id);
 
@@ -199,12 +204,19 @@ export default async function DetalleCursoDocente({
                       : ""}
                     Cierra{" "}
                     {new Date(actividad.fecha_cierre).toLocaleString("es-MX")}
-                    {" · "}
+                    {" ("}
+                    {textoRelativoCierre(actividad.fecha_cierre)}
+                    {") · "}
                     Ponderación {actividad.ponderacion}
                   </p>
 
                   {actividad.materiales_actividad.length > 0 && (
-                    <p className="mt-1 text-xs text-ink/50">
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-ink/50">
+                      <IconoArchivo
+                        nombreArchivo={
+                          actividad.materiales_actividad[0].nombre_archivo
+                        }
+                      />
                       Material: {actividad.materiales_actividad[0].nombre_archivo}
                     </p>
                   )}
@@ -296,7 +308,9 @@ export default async function DetalleCursoDocente({
                       : ""}
                     Cierra{" "}
                     {new Date(examen.fecha_cierre).toLocaleString("es-MX")}
-                    {" · "}
+                    {" ("}
+                    {textoRelativoCierre(examen.fecha_cierre)}
+                    {") · "}
                     Ponderación {examen.ponderacion}
                   </p>
 
