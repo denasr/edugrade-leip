@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
 import FormularioActividad from "./formulario-actividad";
 import FormularioCrearExamen from "./formulario-crear-examen";
+import FormularioConfiguracion from "./formulario-configuracion";
 import TarjetaTarea from "./tarjeta-tarea";
 import TarjetaExamen from "./tarjeta-examen";
 
@@ -31,7 +32,9 @@ export default async function DetalleCursoDocente({
 
   const { data: curso } = await supabase
     .from("cursos")
-    .select("id, nombre, grupo, periodo, clave_acceso")
+    .select(
+      "id, nombre, grupo, periodo, clave_acceso, porcentaje_examenes, porcentaje_tareas, porcentaje_asistencia"
+    )
     .eq("id", id)
     .eq("docente_id", user.id)
     .single();
@@ -41,7 +44,7 @@ export default async function DetalleCursoDocente({
   const { data: actividades } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, ponderacion, bloqueado_manual, materiales_actividad(nombre_archivo)"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, materiales_actividad(nombre_archivo)"
     )
     .eq("curso_id", id)
     .eq("tipo", "TAREA")
@@ -75,7 +78,7 @@ export default async function DetalleCursoDocente({
   const { data: examenes } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, ponderacion, bloqueado_manual"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual"
     )
     .eq("curso_id", id)
     .eq("tipo", "EXAMEN")
@@ -160,6 +163,15 @@ export default async function DetalleCursoDocente({
         </p>
         <span className="clave-acceso mt-2">{curso.clave_acceso}</span>
       </div>
+
+      <FormularioConfiguracion
+        cursoId={curso.id}
+        porcentajes={{
+          porcentaje_examenes: curso.porcentaje_examenes,
+          porcentaje_tareas: curso.porcentaje_tareas,
+          porcentaje_asistencia: curso.porcentaje_asistencia,
+        }}
+      />
 
       <FormularioActividad cursoId={curso.id} />
 

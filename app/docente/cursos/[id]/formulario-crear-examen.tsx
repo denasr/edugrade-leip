@@ -30,7 +30,6 @@ type ExamenExistente = {
   instrucciones: string | null;
   fecha_apertura: string | null;
   fecha_cierre: string;
-  ponderacion: number;
   preguntas: PreguntaExistente[];
 };
 
@@ -197,19 +196,6 @@ export default function FormularioCrearExamen({
                 ? fechaParaInput(examenExistente.fecha_cierre)
                 : undefined
             }
-            className="input"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink/80">
-          Ponderación
-          <input
-            type="number"
-            name="ponderacion"
-            required
-            min={0}
-            step="any"
-            defaultValue={examenExistente?.ponderacion ?? 10}
             className="input"
           />
         </label>

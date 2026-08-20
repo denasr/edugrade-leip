@@ -5,6 +5,58 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EstadoActividad = { error: string | null };
+export type EstadoConfiguracion = { error: string | null };
+
+export async function actualizarConfiguracionCurso(
+  cursoId: string,
+  _estadoPrevio: EstadoConfiguracion,
+  formData: FormData
+): Promise<EstadoConfiguracion> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  const examenes = Number(formData.get("porcentaje_examenes"));
+  const tareas = Number(formData.get("porcentaje_tareas"));
+  const asistencia = Number(formData.get("porcentaje_asistencia"));
+
+  if (
+    !Number.isInteger(examenes) ||
+    !Number.isInteger(tareas) ||
+    !Number.isInteger(asistencia) ||
+    examenes < 0 ||
+    tareas < 0 ||
+    asistencia < 0
+  ) {
+    return { error: "Los porcentajes deben ser números enteros no negativos." };
+  }
+
+  if (examenes + tareas + asistencia !== 100) {
+    return { error: "Los tres porcentajes deben sumar exactamente 100." };
+  }
+
+  // RLS (cursos_update_docente) restringe esto al docente dueño del curso.
+  const { error } = await supabase
+    .from("cursos")
+    .update({
+      porcentaje_examenes: examenes,
+      porcentaje_tareas: tareas,
+      porcentaje_asistencia: asistencia,
+    })
+    .eq("id", cursoId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/docente/cursos/${cursoId}`);
+  return { error: null };
+}
 
 const TIPOS_PERMITIDOS = [
   "application/pdf",
@@ -32,12 +84,11 @@ export async function crearActividad(
   const instrucciones = String(formData.get("instrucciones") ?? "").trim();
   const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
   const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
-  const ponderacion = String(formData.get("ponderacion") ?? "").trim();
   const archivo = formData.get("archivo");
 
-  if (!titulo || !fechaCierre || !ponderacion) {
+  if (!titulo || !fechaCierre) {
     return {
-      error: "Título, fecha de cierre y ponderación son obligatorios.",
+      error: "Título y fecha de cierre son obligatorios.",
     };
   }
 
@@ -62,7 +113,6 @@ export async function crearActividad(
       instrucciones: instrucciones || null,
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
-      ponderacion: Number(ponderacion),
     })
     .select("id")
     .single();
@@ -126,13 +176,12 @@ export async function editarActividad(
   const instrucciones = String(formData.get("instrucciones") ?? "").trim();
   const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
   const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
-  const ponderacion = String(formData.get("ponderacion") ?? "").trim();
   const archivo = formData.get("archivo");
   const quitarMaterial = formData.get("quitar_material") === "on";
 
-  if (!titulo || !fechaCierre || !ponderacion) {
+  if (!titulo || !fechaCierre) {
     return {
-      error: "Título, fecha de cierre y ponderación son obligatorios.",
+      error: "Título y fecha de cierre son obligatorios.",
     };
   }
 
@@ -157,7 +206,6 @@ export async function editarActividad(
       instrucciones: instrucciones || null,
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
-      ponderacion: Number(ponderacion),
     })
     .eq("id", actividadId);
 
@@ -274,12 +322,11 @@ export async function crearExamen(
   const instrucciones = String(formData.get("instrucciones") ?? "").trim();
   const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
   const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
-  const ponderacion = String(formData.get("ponderacion") ?? "").trim();
   const preguntasJson = String(formData.get("preguntas") ?? "");
 
-  if (!titulo || !fechaCierre || !ponderacion) {
+  if (!titulo || !fechaCierre) {
     return {
-      error: "Título, fecha de cierre y ponderación son obligatorios.",
+      error: "Título y fecha de cierre son obligatorios.",
     };
   }
 
@@ -327,7 +374,6 @@ export async function crearExamen(
       instrucciones: instrucciones || null,
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
-      ponderacion: Number(ponderacion),
     })
     .select("id")
     .single();
@@ -395,12 +441,11 @@ export async function editarExamen(
   const instrucciones = String(formData.get("instrucciones") ?? "").trim();
   const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
   const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
-  const ponderacion = String(formData.get("ponderacion") ?? "").trim();
   const preguntasJson = String(formData.get("preguntas") ?? "");
 
-  if (!titulo || !fechaCierre || !ponderacion) {
+  if (!titulo || !fechaCierre) {
     return {
-      error: "Título, fecha de cierre y ponderación son obligatorios.",
+      error: "Título y fecha de cierre son obligatorios.",
     };
   }
 
@@ -446,7 +491,6 @@ export async function editarExamen(
       instrucciones: instrucciones || null,
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
-      ponderacion: Number(ponderacion),
     })
     .eq("id", actividadId);
 

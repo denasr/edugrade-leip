@@ -52,7 +52,7 @@ export default async function DetalleCursoEstudiante({
   const { data: actividades } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, ponderacion, bloqueado_manual, materiales_actividad(nombre_archivo, storage_path)"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, materiales_actividad(nombre_archivo, storage_path)"
     )
     .eq("curso_id", id)
     .eq("tipo", "TAREA")
@@ -111,7 +111,7 @@ export default async function DetalleCursoEstudiante({
   const { data: examenes } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, ponderacion, bloqueado_manual"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual"
     )
     .eq("curso_id", id)
     .eq("tipo", "EXAMEN")
@@ -229,8 +229,7 @@ export default async function DetalleCursoEstudiante({
                     {new Date(actividad.fecha_cierre).toLocaleString("es-MX")}
                     {" ("}
                     {textoRelativoCierre(actividad.fecha_cierre)}
-                    {") · "}
-                    Ponderación {actividad.ponderacion}
+                    {")"}
                   </p>
 
                   {actividad.enlaceDescarga && (
@@ -333,8 +332,7 @@ export default async function DetalleCursoEstudiante({
                     {new Date(examen.fecha_cierre).toLocaleString("es-MX")}
                     {" ("}
                     {textoRelativoCierre(examen.fecha_cierre)}
-                    {") · "}
-                    Ponderación {examen.ponderacion}
+                    {")"}
                   </p>
 
                   {examen.entrega ? (

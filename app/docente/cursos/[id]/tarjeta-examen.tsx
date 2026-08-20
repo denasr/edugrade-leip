@@ -12,7 +12,6 @@ type Examen = {
   instrucciones: string | null;
   fecha_apertura: string | null;
   fecha_cierre: string;
-  ponderacion: number;
   bloqueado_manual: boolean;
 };
 
@@ -47,7 +46,6 @@ export default function TarjetaExamen({
             instrucciones: examen.instrucciones,
             fecha_apertura: examen.fecha_apertura,
             fecha_cierre: examen.fecha_cierre,
-            ponderacion: examen.ponderacion,
             preguntas,
           }}
           tieneRespuestas={stats.presentados > 0}
@@ -96,8 +94,7 @@ export default function TarjetaExamen({
         Cierra {new Date(examen.fecha_cierre).toLocaleString("es-MX")}
         {" ("}
         {textoRelativoCierre(examen.fecha_cierre)}
-        {") · "}
-        Ponderación {examen.ponderacion}
+        {")"}
       </p>
 
       <div className="mt-3 flex items-center gap-4">

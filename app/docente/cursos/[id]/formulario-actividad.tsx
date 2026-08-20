@@ -15,7 +15,6 @@ type ActividadExistente = {
   instrucciones: string | null;
   fecha_apertura: string | null;
   fecha_cierre: string;
-  ponderacion: number;
   material: { nombre_archivo: string } | null;
 };
 
@@ -145,19 +144,6 @@ export default function FormularioActividad({
                 ? fechaParaInput(actividadExistente.fecha_cierre)
                 : undefined
             }
-            className="input"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink/80">
-          Ponderación
-          <input
-            type="number"
-            name="ponderacion"
-            required
-            min={0}
-            step="any"
-            defaultValue={actividadExistente?.ponderacion ?? 10}
             className="input"
           />
         </label>

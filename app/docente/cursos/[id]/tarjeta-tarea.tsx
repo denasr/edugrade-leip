@@ -14,7 +14,6 @@ type Actividad = {
   instrucciones: string | null;
   fecha_apertura: string | null;
   fecha_cierre: string;
-  ponderacion: number;
   bloqueado_manual: boolean;
   materiales_actividad: { nombre_archivo: string }[];
 };
@@ -41,7 +40,6 @@ export default function TarjetaTarea({
             instrucciones: actividad.instrucciones,
             fecha_apertura: actividad.fecha_apertura,
             fecha_cierre: actividad.fecha_cierre,
-            ponderacion: actividad.ponderacion,
             material: actividad.materiales_actividad[0] ?? null,
           }}
           onCancelar={() => setEditando(false)}
@@ -95,8 +93,7 @@ export default function TarjetaTarea({
         Cierra {new Date(actividad.fecha_cierre).toLocaleString("es-MX")}
         {" ("}
         {textoRelativoCierre(actividad.fecha_cierre)}
-        {") · "}
-        Ponderación {actividad.ponderacion}
+        {")"}
       </p>
 
       {actividad.materiales_actividad.length > 0 && (
