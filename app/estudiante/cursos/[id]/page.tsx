@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   estadoActividad,
   motivoCierre,
   compararPorCierre,
   textoRelativoCierre,
 } from "@/lib/actividades";
+import { calcularCalificacionFinal, textoNotaParcial } from "@/lib/calificacion-final";
 import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioEntrega from "./formulario-entrega";
 import FormularioPresentarExamen from "./formulario-presentar-examen";
@@ -34,7 +36,7 @@ export default async function DetalleCursoEstudiante({
 
   const { data: inscripcion } = await supabase
     .from("inscripciones")
-    .select("id")
+    .select("id, created_at")
     .eq("curso_id", id)
     .eq("estudiante_id", user.id)
     .maybeSingle();
@@ -43,7 +45,9 @@ export default async function DetalleCursoEstudiante({
 
   const { data: curso } = await supabase
     .from("cursos")
-    .select("nombre, grupo, periodo")
+    .select(
+      "nombre, grupo, periodo, porcentaje_tareas, porcentaje_examenes, porcentaje_asistencia"
+    )
     .eq("id", id)
     .single();
 
@@ -169,6 +173,67 @@ export default async function DetalleCursoEstudiante({
     })
   );
 
+  const calificacionesTareas = (entregas ?? [])
+    .map((e) => e.evaluaciones?.calificacion_final)
+    .filter((v): v is number => v !== null && v !== undefined);
+  const promedioTareas =
+    calificacionesTareas.length > 0
+      ? calificacionesTareas.reduce((a, b) => a + b, 0) /
+        calificacionesTareas.length
+      : null;
+
+  const calificacionesExamenes = (entregasExamen ?? [])
+    .map((e) => e.evaluaciones?.calificacion_final)
+    .filter((v): v is number => v !== null && v !== undefined);
+  const promedioExamenes =
+    calificacionesExamenes.length > 0
+      ? calificacionesExamenes.reduce((a, b) => a + b, 0) /
+        calificacionesExamenes.length
+      : null;
+
+  // La lectura de asistencia va con la secret key: hoy no hay policy de
+  // lectura para el estudiante (se dejó fuera a propósito hasta este
+  // encargo), y en vez de agregar una nueva policy calculamos aquí, ya
+  // verificada la inscripción arriba, y solo devolvemos al cliente el
+  // porcentaje ya calculado — nunca las filas crudas de otros estudiantes.
+  const fechaInscripcion = new Date(inscripcion.created_at)
+    .toISOString()
+    .slice(0, 10);
+
+  const admin = createAdminClient();
+  const { data: sesionesDesdeInscripcion } = await admin
+    .from("sesiones_asistencia")
+    .select("id")
+    .eq("curso_id", id)
+    .gte("fecha", fechaInscripcion);
+
+  const sesionIds = (sesionesDesdeInscripcion ?? []).map((s) => s.id);
+  const totalSesiones = sesionIds.length;
+
+  let sesionesPresente = 0;
+  if (totalSesiones > 0) {
+    const { data: misAsistencias } = await admin
+      .from("asistencias")
+      .select("estado")
+      .eq("estudiante_id", user.id)
+      .in("sesion_id", sesionIds);
+
+    sesionesPresente = (misAsistencias ?? []).filter(
+      (a) => a.estado === "presente"
+    ).length;
+  }
+
+  const porcentajeAsistencia =
+    totalSesiones > 0 ? (sesionesPresente / totalSesiones) * 100 : null;
+
+  const resultadoFinal = calcularCalificacionFinal(
+    promedioTareas,
+    promedioExamenes,
+    porcentajeAsistencia,
+    curso
+  );
+  const notaParcial = textoNotaParcial(resultadoFinal.categoriasFaltantes);
+
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
       <div className="w-full max-w-sm text-center">
@@ -182,6 +247,50 @@ export default async function DetalleCursoEstudiante({
           {curso.grupo} · {curso.periodo}
         </p>
       </div>
+
+      <section className="card w-full max-w-sm p-6">
+        <h2 className="font-title text-xl text-verde-bosque">
+          Calificación final
+        </h2>
+
+        <div className="mt-4 flex flex-col gap-2 text-sm text-ink/80">
+          <div className="flex items-center justify-between">
+            <span>Tareas ({curso.porcentaje_tareas}%)</span>
+            <span>
+              {resultadoFinal.promedioTareas !== null
+                ? `${resultadoFinal.promedioTareas.toFixed(1)}/10`
+                : "Sin datos"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Exámenes ({curso.porcentaje_examenes}%)</span>
+            <span>
+              {resultadoFinal.promedioExamenes !== null
+                ? `${resultadoFinal.promedioExamenes.toFixed(1)}/10`
+                : "Sin datos"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Asistencia ({curso.porcentaje_asistencia}%)</span>
+            <span>
+              {resultadoFinal.porcentajeAsistencia !== null
+                ? `${resultadoFinal.porcentajeAsistencia.toFixed(0)}%`
+                : "Sin datos"}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4 border-t border-verde-bosque/15 pt-4">
+          <p className="font-title text-2xl text-verde-bosque">
+            {resultadoFinal.calificacionFinal !== null
+              ? `${resultadoFinal.calificacionFinal.toFixed(1)}/10`
+              : "Sin datos suficientes"}
+          </p>
+          {notaParcial && (
+            <p className="mt-1 text-xs text-terracota">{notaParcial}</p>
+          )}
+        </div>
+      </section>
 
       <section className="w-full max-w-sm">
         <h2 className="font-title text-xl text-verde-bosque">Tareas</h2>
