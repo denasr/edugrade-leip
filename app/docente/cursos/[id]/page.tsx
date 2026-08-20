@@ -6,6 +6,7 @@ import { compararPorCierre } from "@/lib/actividades";
 import FormularioActividad from "./formulario-actividad";
 import FormularioCrearExamen from "./formulario-crear-examen";
 import FormularioConfiguracion from "./formulario-configuracion";
+import BotonTomarAsistencia from "./boton-tomar-asistencia";
 import TarjetaTarea from "./tarjeta-tarea";
 import TarjetaExamen from "./tarjeta-examen";
 
@@ -122,6 +123,35 @@ export default async function DetalleCursoDocente({
     statsPorExamen.set(entrega.actividad_id, actual);
   }
 
+  const { data: sesionesAsistencia } = await supabase
+    .from("sesiones_asistencia")
+    .select("id, fecha")
+    .eq("curso_id", id)
+    .order("fecha", { ascending: false });
+
+  const sesionIds = (sesionesAsistencia ?? []).map((s) => s.id);
+  const { data: asistenciasTodas } =
+    sesionIds.length > 0
+      ? await supabase
+          .from("asistencias")
+          .select("sesion_id, estado")
+          .in("sesion_id", sesionIds)
+      : { data: [] };
+
+  const conteoPorSesion = new Map<
+    string,
+    { presentes: number; ausentes: number }
+  >();
+  for (const a of asistenciasTodas ?? []) {
+    const actual = conteoPorSesion.get(a.sesion_id) ?? {
+      presentes: 0,
+      ausentes: 0,
+    };
+    if (a.estado === "presente") actual.presentes += 1;
+    else actual.ausentes += 1;
+    conteoPorSesion.set(a.sesion_id, actual);
+  }
+
   // Precarga las preguntas (con `correcta`) para el formulario de edición.
   // Solo llega a este punto quien ya se confirmó como docente dueño del
   // curso más arriba, así que es seguro usar la secret key aquí.
@@ -227,6 +257,45 @@ export default async function DetalleCursoDocente({
                 preguntas={preguntasPorExamen.get(examen.id) ?? []}
               />
             ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="w-full max-w-sm">
+        <h2 className="font-title text-xl text-verde-bosque">Asistencia</h2>
+
+        <div className="mt-4">
+          <BotonTomarAsistencia cursoId={curso.id} />
+        </div>
+
+        {!sesionesAsistencia || sesionesAsistencia.length === 0 ? (
+          <p className="mt-4 text-sm text-ink/60">
+            Todavía no has tomado asistencia.
+          </p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-3">
+            {sesionesAsistencia.map((sesion) => {
+              const conteo = conteoPorSesion.get(sesion.id) ?? {
+                presentes: 0,
+                ausentes: 0,
+              };
+              return (
+                <li key={sesion.id} className="card p-4">
+                  <Link
+                    href={`/docente/cursos/${curso.id}/asistencia/${sesion.fecha}`}
+                    className="font-medium text-ink hover:underline"
+                  >
+                    {new Date(`${sesion.fecha}T00:00:00`).toLocaleDateString(
+                      "es-MX",
+                      { year: "numeric", month: "long", day: "numeric" }
+                    )}
+                  </Link>
+                  <p className="mt-1 text-xs text-ink/50">
+                    {conteo.presentes} presentes · {conteo.ausentes} ausentes
+                  </p>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
