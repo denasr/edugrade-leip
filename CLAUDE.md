@@ -98,9 +98,22 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   todavía, o el estudiante solo tiene justificados), no hay dato para esa categoría: se
   excluye del cálculo y su peso se reparte proporcionalmente entre las que sí tienen —
   nunca cuenta como 0 — y se le indica al estudiante que es una calificación parcial. Ver
-  `lib/calificacion-final.ts` (`calcularPorcentajeAsistencia`, `calcularCalificacionFinal`).
-  Por ahora esto solo se muestra al estudiante; un tablero para que el docente vea la
-  calificación de todo su grupo de un vistazo es trabajo futuro, no implementado.
+  `lib/calificacion-final.ts` (`calcularPorcentajeAsistencia`, `calcularCalificacionFinal`,
+  `promedioCalificaciones`). El promedio de tareas/exámenes de un estudiante (solo entregas
+  calificadas, excluye las que no) vive en `promedioCalificaciones` — la usan tanto la vista
+  del estudiante como el libro de calificaciones del docente, para no duplicar la lógica.
+- **Libro de calificaciones del docente.** `/docente/cursos/[id]/calificaciones`, enlazada
+  desde `/docente/cursos/[id]`. Una fila por estudiante inscrito, una columna por tarea
+  (nota, "Sin calificar" si hay entrega sin evaluar, "Sin entregar" si no hay entrega), una
+  columna por examen ("No presentado" si no hay entrega — un examen entregado siempre trae
+  evaluación porque se autocalifica al momento), % de asistencia y la calificación final
+  resaltada, calculados con las mismas funciones de `lib/calificacion-final.ts` que usa la
+  vista del estudiante (no hay una segunda fórmula). El % de asistencia se calcula por
+  estudiante desde su propia fecha de inscripción, igual que en su vista individual; a
+  diferencia de ahí, aquí no hace falta la secret key porque `asistencias` y
+  `sesiones_asistencia` ya tienen policy de lectura para el docente dueño del curso. Con
+  overflow-x-auto y primera columna fija (`sticky left-0`) para cursos con muchas
+  actividades. No incluye exportar a Excel (pendiente, trabajo futuro).
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,

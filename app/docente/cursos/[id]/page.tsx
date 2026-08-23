@@ -194,6 +194,14 @@ export default async function DetalleCursoDocente({
           {curso.grupo} · {curso.periodo}
         </p>
         <span className="clave-acceso mt-2">{curso.clave_acceso}</span>
+        <div>
+          <Link
+            href={`/docente/cursos/${curso.id}/calificaciones`}
+            className="link-muted"
+          >
+            Ver libro de calificaciones →
+          </Link>
+        </div>
       </div>
 
       <FormularioConfiguracion

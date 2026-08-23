@@ -11,6 +11,7 @@ import {
 import {
   calcularCalificacionFinal,
   calcularPorcentajeAsistencia,
+  promedioCalificaciones,
   textoNotaParcial,
 } from "@/lib/calificacion-final";
 import { IconoArchivo } from "@/lib/icono-archivo";
@@ -177,23 +178,13 @@ export default async function DetalleCursoEstudiante({
     })
   );
 
-  const calificacionesTareas = (entregas ?? [])
-    .map((e) => e.evaluaciones?.calificacion_final)
-    .filter((v): v is number => v !== null && v !== undefined);
-  const promedioTareas =
-    calificacionesTareas.length > 0
-      ? calificacionesTareas.reduce((a, b) => a + b, 0) /
-        calificacionesTareas.length
-      : null;
+  const promedioTareas = promedioCalificaciones(
+    (entregas ?? []).map((e) => e.evaluaciones?.calificacion_final)
+  );
 
-  const calificacionesExamenes = (entregasExamen ?? [])
-    .map((e) => e.evaluaciones?.calificacion_final)
-    .filter((v): v is number => v !== null && v !== undefined);
-  const promedioExamenes =
-    calificacionesExamenes.length > 0
-      ? calificacionesExamenes.reduce((a, b) => a + b, 0) /
-        calificacionesExamenes.length
-      : null;
+  const promedioExamenes = promedioCalificaciones(
+    (entregasExamen ?? []).map((e) => e.evaluaciones?.calificacion_final)
+  );
 
   // La lectura de asistencia va con la secret key: hoy no hay policy de
   // lectura para el estudiante (se dejó fuera a propósito hasta este

@@ -11,6 +11,20 @@ export function calcularPorcentajeAsistencia(
   return total > 0 ? (presentes / total) * 100 : null;
 }
 
+// Promedio de las calificaciones ya obtenidas (tareas o exámenes), ignorando
+// las actividades sin entregar/sin calificar en vez de contarlas como 0 —
+// misma regla que categoriasFaltantes: falta de datos no es una nota mala.
+export function promedioCalificaciones(
+  calificaciones: (number | null | undefined)[]
+): number | null {
+  const validas = calificaciones.filter(
+    (v): v is number => v !== null && v !== undefined
+  );
+  return validas.length > 0
+    ? validas.reduce((a, b) => a + b, 0) / validas.length
+    : null;
+}
+
 export type PesosCurso = {
   porcentaje_tareas: number;
   porcentaje_examenes: number;
