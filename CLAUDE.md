@@ -113,7 +113,22 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   diferencia de ahí, aquí no hace falta la secret key porque `asistencias` y
   `sesiones_asistencia` ya tienen policy de lectura para el docente dueño del curso. Con
   overflow-x-auto y primera columna fija (`sticky left-0`) para cursos con muchas
-  actividades. No incluye exportar a Excel (pendiente, trabajo futuro).
+  actividades. Toda esta obtención de datos y cálculo por estudiante vive en
+  `lib/libro-calificaciones.ts` (`obtenerLibroCalificaciones`, más `textoCeldaTarea` /
+  `textoCeldaExamen` / `textoAsistencia` / `textoCalificacionFinalBase` /
+  `textoCalificacionFinalConParcial` para el texto exacto de cada celda) — ni la página ni
+  la exportación a Excel recalculan nada por su cuenta, ambas consumen esa misma función.
+- **Exportación del libro de calificaciones a Excel.** Botón "Exportar a Excel" en el libro
+  de calificaciones, visible solo si hay estudiantes inscritos. Descarga un `.xlsx` real
+  generado en el servidor con `exceljs` desde
+  `app/docente/cursos/[id]/calificaciones/export/route.ts` (Route Handler, no una página) —
+  repite ahí las mismas verificaciones de sesión/rol/dueño del curso que la página, porque
+  una ruta de servidor no hereda esa protección. Mismas columnas y mismos textos que la
+  tabla en pantalla (vía las funciones de `lib/libro-calificaciones.ts`); la nota final
+  parcial se distingue con el sufijo de texto " (parcial)" en la misma celda, ya que un
+  `.xlsx` no puede reproducir el color aparte que usa la pantalla. Nombre del archivo:
+  `calificaciones-{slug-del-curso}-{fecha-de-hoy}.xlsx`, con el slug sin acentos ni
+  caracteres especiales para que el header `Content-Disposition` no tenga problemas.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
