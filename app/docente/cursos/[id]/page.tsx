@@ -140,15 +140,17 @@ export default async function DetalleCursoDocente({
 
   const conteoPorSesion = new Map<
     string,
-    { presentes: number; ausentes: number }
+    { presentes: number; ausentes: number; justificados: number }
   >();
   for (const a of asistenciasTodas ?? []) {
     const actual = conteoPorSesion.get(a.sesion_id) ?? {
       presentes: 0,
       ausentes: 0,
+      justificados: 0,
     };
     if (a.estado === "presente") actual.presentes += 1;
-    else actual.ausentes += 1;
+    else if (a.estado === "ausente") actual.ausentes += 1;
+    else if (a.estado === "justificado") actual.justificados += 1;
     conteoPorSesion.set(a.sesion_id, actual);
   }
 
@@ -278,6 +280,7 @@ export default async function DetalleCursoDocente({
               const conteo = conteoPorSesion.get(sesion.id) ?? {
                 presentes: 0,
                 ausentes: 0,
+                justificados: 0,
               };
               return (
                 <li key={sesion.id} className="card p-4">
@@ -291,7 +294,8 @@ export default async function DetalleCursoDocente({
                     )}
                   </Link>
                   <p className="mt-1 text-xs text-ink/50">
-                    {conteo.presentes} presentes · {conteo.ausentes} ausentes
+                    {conteo.presentes} presentes · {conteo.ausentes} ausentes ·{" "}
+                    {conteo.justificados} justificados
                   </p>
                 </li>
               );

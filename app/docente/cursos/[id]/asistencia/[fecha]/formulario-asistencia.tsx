@@ -76,6 +76,16 @@ export default function FormularioAsistencia({
                 />
                 Ausente
               </label>
+              <label className="flex items-center gap-1 text-sm text-ink/70">
+                <input
+                  type="radio"
+                  name={`estado-${estudiante.id}`}
+                  value="justificado"
+                  defaultChecked={estudiante.estado === "justificado"}
+                  className="accent-abierta"
+                />
+                Justificado
+              </label>
             </div>
           </li>
         ))}

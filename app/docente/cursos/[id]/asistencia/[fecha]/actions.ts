@@ -26,7 +26,7 @@ export async function guardarAsistencia(
     if (
       nombre.startsWith("estado-") &&
       typeof valor === "string" &&
-      (valor === "presente" || valor === "ausente")
+      (valor === "presente" || valor === "ausente" || valor === "justificado")
     ) {
       registros.push({
         sesion_id: sesionId,

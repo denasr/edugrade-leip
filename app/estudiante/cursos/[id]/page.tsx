@@ -8,7 +8,11 @@ import {
   compararPorCierre,
   textoRelativoCierre,
 } from "@/lib/actividades";
-import { calcularCalificacionFinal, textoNotaParcial } from "@/lib/calificacion-final";
+import {
+  calcularCalificacionFinal,
+  calcularPorcentajeAsistencia,
+  textoNotaParcial,
+} from "@/lib/calificacion-final";
 import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioEntrega from "./formulario-entrega";
 import FormularioPresentarExamen from "./formulario-presentar-examen";
@@ -208,23 +212,27 @@ export default async function DetalleCursoEstudiante({
     .gte("fecha", fechaInscripcion);
 
   const sesionIds = (sesionesDesdeInscripcion ?? []).map((s) => s.id);
-  const totalSesiones = sesionIds.length;
 
   let sesionesPresente = 0;
-  if (totalSesiones > 0) {
+  let sesionesAusente = 0;
+  if (sesionIds.length > 0) {
     const { data: misAsistencias } = await admin
       .from("asistencias")
       .select("estado")
       .eq("estudiante_id", user.id)
       .in("sesion_id", sesionIds);
 
-    sesionesPresente = (misAsistencias ?? []).filter(
-      (a) => a.estado === "presente"
-    ).length;
+    for (const a of misAsistencias ?? []) {
+      if (a.estado === "presente") sesionesPresente += 1;
+      else if (a.estado === "ausente") sesionesAusente += 1;
+      // "justificado" se excluye del cálculo, ni suma ni resta.
+    }
   }
 
-  const porcentajeAsistencia =
-    totalSesiones > 0 ? (sesionesPresente / totalSesiones) * 100 : null;
+  const porcentajeAsistencia = calcularPorcentajeAsistencia(
+    sesionesPresente,
+    sesionesAusente
+  );
 
   const resultadoFinal = calcularCalificacionFinal(
     promedioTareas,

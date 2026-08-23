@@ -1,3 +1,16 @@
+// Porcentaje de asistencia de un estudiante: presentes sobre presentes +
+// ausentes. Los registros 'justificado' se excluyen de ambos — ni suman al
+// numerador ni al denominador. Si no hay presentes ni ausentes (p. ej. un
+// estudiante con solo justificados, o sin registros todavía), no hay datos
+// para esta categoría: null, no una división entre cero.
+export function calcularPorcentajeAsistencia(
+  presentes: number,
+  ausentes: number
+): number | null {
+  const total = presentes + ausentes;
+  return total > 0 ? (presentes / total) * 100 : null;
+}
+
 export type PesosCurso = {
   porcentaje_tareas: number;
   porcentaje_examenes: number;
