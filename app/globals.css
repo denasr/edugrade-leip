@@ -15,8 +15,8 @@
   --color-ink: #2a2a24;
   --color-superficie: #ffffff;
 
-  --color-abierta: #c08a2e;
-  --color-cerrada: #8c8371;
+  --color-abierta: #7d5a1e;
+  --color-cerrada: #635c50;
   --color-pendiente: #b5533c;
   --color-calificado: #1f3b2e;
 
@@ -52,7 +52,7 @@ body {
   }
 
   .link-muted {
-    @apply inline-flex min-h-11 items-center px-1 text-sm text-ink/60 transition-colors hover:text-verde-bosque hover:underline;
+    @apply inline-flex min-h-11 items-center px-1 text-sm text-ink/70 transition-colors hover:text-verde-bosque hover:underline;
   }
 
   .clave-acceso {
@@ -68,7 +68,7 @@ body {
   }
 
   .badge-pendiente {
-    @apply inline-block shrink-0 rounded-full bg-pendiente/12 px-2.5 py-0.5 text-xs font-medium text-pendiente;
+    @apply inline-block shrink-0 rounded-full bg-pendiente/5 px-2.5 py-0.5 text-xs font-medium text-pendiente;
   }
 
   .badge-calificado {

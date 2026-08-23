@@ -119,7 +119,7 @@ export default async function AsistenciaFecha({
       </div>
 
       {estudiantes.length === 0 ? (
-        <p className="text-sm text-ink/60">
+        <p className="text-sm text-ink/70">
           Todavía no hay estudiantes inscritos en este curso.
         </p>
       ) : (

@@ -116,7 +116,7 @@ export default async function DetalleActividadDocente({
         <h2 className="font-title text-xl text-verde-bosque">Entregas</h2>
 
         {entregasConEnlace.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/60">
+          <p className="mt-4 text-sm text-ink/70">
             Todavía no hay entregas para esta tarea.
           </p>
         ) : (
@@ -142,7 +142,7 @@ export default async function DetalleActividadDocente({
                     </span>
                   </div>
 
-                  <p className="mt-1 text-xs text-ink/50">
+                  <p className="mt-1 text-xs text-ink/70">
                     {new Date(entrega.created_at).toLocaleString("es-MX")}
                   </p>
 

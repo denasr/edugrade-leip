@@ -84,7 +84,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="mt-6 text-center text-sm text-ink/60">
+        <p className="mt-6 text-center text-sm text-ink/70">
           ¿No tienes cuenta?{" "}
           <Link href="/registro" className="text-verde-bosque hover:underline">
             Regístrate

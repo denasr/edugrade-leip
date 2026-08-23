@@ -217,7 +217,7 @@ export default function FormularioCrearExamen({
               className="flex flex-col gap-2 rounded-lg border border-verde-bosque/15 bg-crema/40 p-3"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-ink/50">
+                <span className="text-xs font-medium text-ink/70">
                   Pregunta {indice + 1}
                 </span>
                 {preguntas.length > 1 && (
@@ -268,7 +268,7 @@ export default function FormularioCrearExamen({
                   />
                 </label>
               ))}
-              <span className="text-xs text-ink/50">
+              <span className="text-xs text-ink/70">
                 Marca con el radio cuál opción es la correcta.
               </span>
 

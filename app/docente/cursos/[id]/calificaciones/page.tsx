@@ -50,7 +50,7 @@ export default async function LibroCalificaciones({
       </div>
 
       {estudiantes.length === 0 ? (
-        <p className="text-sm text-ink/60">
+        <p className="text-sm text-ink/70">
           Todavía no hay estudiantes inscritos en este curso.
         </p>
       ) : (
@@ -125,7 +125,7 @@ export default async function LibroCalificaciones({
                       {textoCalificacionFinalBase(estudiante.resultado)}
                       {estudiante.resultado.calificacionFinal !== null &&
                         estudiante.resultado.esParcial && (
-                          <span className="ml-1 text-xs text-terracota">
+                          <span className="ml-1 rounded-full bg-superficie px-1.5 py-0.5 text-xs text-terracota">
                             (parcial)
                           </span>
                         )}

@@ -64,7 +64,7 @@ export default async function PanelEstudiante() {
                 >
                   <Link href={`/estudiante/cursos/${curso.id}`}>
                     <p className="font-medium text-ink">{curso.nombre}</p>
-                    <p className="text-sm text-ink/60">
+                    <p className="text-sm text-ink/70">
                       {curso.grupo} · {curso.periodo}
                     </p>
                   </Link>

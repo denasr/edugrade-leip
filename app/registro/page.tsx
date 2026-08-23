@@ -141,7 +141,7 @@ export default function RegistroPage() {
           </button>
         </div>
 
-        <p className="mt-6 text-center text-sm text-ink/60">
+        <p className="mt-6 text-center text-sm text-ink/70">
           ¿Ya tienes cuenta?{" "}
           <Link href="/login" className="text-verde-bosque hover:underline">
             Inicia sesión

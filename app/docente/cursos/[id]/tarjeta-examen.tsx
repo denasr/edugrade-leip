@@ -79,7 +79,7 @@ export default function TarjetaExamen({
         </span>
       </div>
 
-      <p className="mt-1 text-xs text-ink/50">
+      <p className="mt-1 text-xs text-ink/70">
         {stats.presentados} presentados · promedio {promedio}/10
       </p>
 
@@ -87,7 +87,7 @@ export default function TarjetaExamen({
         <p className="mt-1 text-sm text-ink/70">{examen.instrucciones}</p>
       )}
 
-      <p className="mt-2 text-xs text-ink/50">
+      <p className="mt-2 text-xs text-ink/70">
         {examen.fecha_apertura
           ? `Abre ${new Date(examen.fecha_apertura).toLocaleString("es-MX")} · `
           : ""}

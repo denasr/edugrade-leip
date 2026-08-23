@@ -137,6 +137,19 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   variantes `dark:` — un solo tema, por decisión explícita. Clases compartidas
   (`.card`, `.btn-primary`, `.btn-accent`, `.input`, `.badge-*`, `.toast`, etc.) en el mismo
   `globals.css`, para no repetir utilidades sueltas en cada archivo.
+- **Contraste de texto (AA de WCAG).** Auditado con `axe-core` vía Playwright contra las
+  pantallas principales; texto normal cumple 4.5:1. `crema`, `verde-bosque` y `terracota`
+  no se tocaron — pasan en todos sus usos reales (`terracota` sobre una tarjeta blanca da
+  4.92; sobre `crema` directo, sin tarjeta de por medio, da 4.28 y no cumpliría, pero esa
+  combinación no se usa hoy en ninguna pantalla — si se llega a necesitar texto terracota
+  directo sobre el fondo `crema` del `<main>`, hay que revisar el tono en ese momento).
+  `abierta` (`#c08a2e`→`#7d5a1e`) y `cerrada` (`#8c8371`→`#635c50`) sí se oscurecieron —
+  a su tono original no llegaban a AA ni siquiera sobre blanco puro, no había forma de
+  arreglarlos solo con el fondo del badge. `text-ink/50` y `text-ink/60` (incluyendo
+  `.link-muted`) subieron a `text-ink/70` en todo el proyecto. `badge-pendiente` bajó su
+  tinte de fondo de `/12` a `/5` (el texto terracota ya pasaba solo, era el fondo el que le
+  restaba contraste). El "(parcial)" del libro de calificaciones lleva su propio fondo
+  blanco en vez de heredar el tinte `verde-bosque/8` de la celda, por la misma razón.
 
 ## Esquema de base de datos (estado actual)
 Foto combinada de todo lo aplicado hasta ahora, no una sola migración — ver

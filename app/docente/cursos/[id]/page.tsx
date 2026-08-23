@@ -219,7 +219,7 @@ export default async function DetalleCursoDocente({
         <h2 className="font-title text-xl text-verde-bosque">Tareas</h2>
 
         {!actividades || actividades.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/60">
+          <p className="mt-4 text-sm text-ink/70">
             Todavía no has creado ninguna tarea.
           </p>
         ) : (
@@ -247,7 +247,7 @@ export default async function DetalleCursoDocente({
         <h2 className="font-title text-xl text-verde-bosque">Exámenes</h2>
 
         {!examenes || examenes.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/60">
+          <p className="mt-4 text-sm text-ink/70">
             Todavía no has creado ningún examen.
           </p>
         ) : (
@@ -279,7 +279,7 @@ export default async function DetalleCursoDocente({
         </div>
 
         {!sesionesAsistencia || sesionesAsistencia.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/60">
+          <p className="mt-4 text-sm text-ink/70">
             Todavía no has tomado asistencia.
           </p>
         ) : (
@@ -301,7 +301,7 @@ export default async function DetalleCursoDocente({
                       { year: "numeric", month: "long", day: "numeric" }
                     )}
                   </Link>
-                  <p className="mt-1 text-xs text-ink/50">
+                  <p className="mt-1 text-xs text-ink/70">
                     {conteo.presentes} presentes · {conteo.ausentes} ausentes ·{" "}
                     {conteo.justificados} justificados
                   </p>

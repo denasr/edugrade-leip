@@ -295,7 +295,7 @@ export default async function DetalleCursoEstudiante({
         <h2 className="font-title text-xl text-verde-bosque">Tareas</h2>
 
         {actividadesConEnlace.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/60">
+          <p className="mt-4 text-sm text-ink/70">
             Todavía no hay tareas publicadas en este curso.
           </p>
         ) : (
@@ -327,7 +327,7 @@ export default async function DetalleCursoEstudiante({
                     </p>
                   )}
 
-                  <p className="mt-2 text-xs text-ink/50">
+                  <p className="mt-2 text-xs text-ink/70">
                     {actividad.fecha_apertura
                       ? `Abre ${new Date(
                           actividad.fecha_apertura
@@ -385,7 +385,7 @@ export default async function DetalleCursoEstudiante({
                   ) : estado === "ABIERTA" ? (
                     <FormularioEntrega actividadId={actividad.id} cursoId={id} />
                   ) : (
-                    <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/50">
+                    <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/70">
                       No se puede entregar. {motivoCierre(actividad)}
                     </p>
                   )}
@@ -400,7 +400,7 @@ export default async function DetalleCursoEstudiante({
         <h2 className="font-title text-xl text-verde-bosque">Exámenes</h2>
 
         {examenesConPreguntas.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/60">
+          <p className="mt-4 text-sm text-ink/70">
             Todavía no hay exámenes publicados en este curso.
           </p>
         ) : (
@@ -430,7 +430,7 @@ export default async function DetalleCursoEstudiante({
                     </p>
                   )}
 
-                  <p className="mt-2 text-xs text-ink/50">
+                  <p className="mt-2 text-xs text-ink/70">
                     {examen.fecha_apertura
                       ? `Abre ${new Date(
                           examen.fecha_apertura
@@ -462,7 +462,7 @@ export default async function DetalleCursoEstudiante({
                       preguntas={examen.preguntas}
                     />
                   ) : (
-                    <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/50">
+                    <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/70">
                       No se puede presentar. {motivoCierre(examen)}
                     </p>
                   )}

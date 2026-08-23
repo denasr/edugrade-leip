@@ -42,7 +42,7 @@ export default async function PanelDocente() {
         <h2 className="font-title text-xl text-verde-bosque">Mis cursos</h2>
 
         {!cursos || cursos.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/60">
+          <p className="mt-4 text-sm text-ink/70">
             Todavía no has creado ningún curso.
           </p>
         ) : (
@@ -54,12 +54,12 @@ export default async function PanelDocente() {
               >
                 <Link href={`/docente/cursos/${curso.id}`}>
                   <p className="font-medium text-ink">{curso.nombre}</p>
-                  <p className="text-sm text-ink/60">
+                  <p className="text-sm text-ink/70">
                     {curso.grupo} · {curso.periodo}
                   </p>
                   <div className="mt-2 flex items-center justify-between text-sm">
                     <span className="clave-acceso">{curso.clave_acceso}</span>
-                    <span className="text-ink/60">
+                    <span className="text-ink/70">
                       {curso.inscripciones[0]?.count ?? 0} inscritos
                     </span>
                   </div>

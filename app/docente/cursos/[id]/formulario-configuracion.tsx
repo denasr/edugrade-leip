@@ -78,7 +78,7 @@ export default function FormularioConfiguracion({
       <h2 className="font-title text-xl text-verde-bosque">
         Configuración de ponderación
       </h2>
-      <p className="mt-1 text-sm text-ink/60">
+      <p className="mt-1 text-sm text-ink/70">
         Qué tanto pesa cada categoría en la calificación final del curso.
       </p>
 
@@ -128,7 +128,7 @@ export default function FormularioConfiguracion({
           />
         </label>
 
-        <p className={`text-sm ${sumaValida ? "text-ink/60" : "text-terracota"}`}>
+        <p className={`text-sm ${sumaValida ? "text-ink/70" : "text-terracota"}`}>
           Suma: {suma}/100{!sumaValida && " — debe sumar exactamente 100"}
         </p>
 

@@ -66,7 +66,7 @@ export default function FormularioEntrega({
           accept=".pdf,.docx,.jpg,.jpeg,.png"
           className="text-sm text-ink/70 file:mr-3 file:rounded-full file:border-0 file:bg-verde-bosque/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-verde-bosque"
         />
-        <span className="text-xs text-ink/50">
+        <span className="text-xs text-ink/70">
           PDF, DOCX, JPG o PNG. Máximo 10 MB.
         </span>
       </label>

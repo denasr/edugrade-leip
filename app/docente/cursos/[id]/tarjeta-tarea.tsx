@@ -77,7 +77,7 @@ export default function TarjetaTarea({
 
       <Link
         href={`/docente/actividades/${actividad.id}`}
-        className="mt-1 inline-block text-xs text-ink/50 hover:underline"
+        className="mt-1 inline-block text-xs text-ink/70 hover:underline"
       >
         {conteo.total} entregas · {conteo.pendientes} pendientes
       </Link>
@@ -86,7 +86,7 @@ export default function TarjetaTarea({
         <p className="mt-1 text-sm text-ink/70">{actividad.instrucciones}</p>
       )}
 
-      <p className="mt-2 text-xs text-ink/50">
+      <p className="mt-2 text-xs text-ink/70">
         {actividad.fecha_apertura
           ? `Abre ${new Date(actividad.fecha_apertura).toLocaleString("es-MX")} · `
           : ""}
@@ -97,7 +97,7 @@ export default function TarjetaTarea({
       </p>
 
       {actividad.materiales_actividad.length > 0 && (
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-ink/50">
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-ink/70">
           <IconoArchivo nombreArchivo={actividad.materiales_actividad[0].nombre_archivo} />
           Material: {actividad.materiales_actividad[0].nombre_archivo}
         </p>
