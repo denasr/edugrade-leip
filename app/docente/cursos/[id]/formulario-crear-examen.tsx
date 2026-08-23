@@ -224,7 +224,7 @@ export default function FormularioCrearExamen({
                   <button
                     type="button"
                     onClick={() => quitarPregunta(indice)}
-                    className="text-xs text-terracota hover:underline"
+                    className="inline-flex min-h-11 items-center text-xs text-terracota hover:underline"
                   >
                     Quitar
                   </button>
@@ -293,7 +293,7 @@ export default function FormularioCrearExamen({
           <button
             type="button"
             onClick={agregarPregunta}
-            className="self-start text-sm font-medium text-verde-bosque hover:underline"
+            className="inline-flex min-h-11 items-center self-start text-sm font-medium text-verde-bosque hover:underline"
           >
             + Agregar pregunta
           </button>

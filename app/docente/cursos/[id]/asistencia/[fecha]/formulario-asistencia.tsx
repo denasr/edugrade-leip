@@ -50,12 +50,12 @@ export default function FormularioAsistencia({
         {estudiantes.map((estudiante) => (
           <li
             key={estudiante.id}
-            className="flex items-center justify-between gap-3 py-2"
+            className="flex flex-wrap items-center justify-between gap-3 py-2"
           >
             <span className="text-sm text-ink">
               {estudiante.nombre_completo}
             </span>
-            <div className="flex shrink-0 gap-3">
+            <div className="flex flex-wrap gap-3">
               <label className="flex items-center gap-1 text-sm text-ink/70">
                 <input
                   type="radio"

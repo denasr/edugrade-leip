@@ -21,7 +21,9 @@ export default async function EncabezadoApp() {
         EduGrade LEIP
       </span>
       <div className="flex items-center gap-4">
-        <span className="text-sm text-ink/70">{perfil?.nombre_completo}</span>
+        <span className="hidden text-sm text-ink/70 sm:inline">
+          {perfil?.nombre_completo}
+        </span>
         <BotonCerrarSesion />
       </div>
     </header>
