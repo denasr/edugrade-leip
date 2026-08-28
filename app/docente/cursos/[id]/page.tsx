@@ -7,8 +7,10 @@ import FormularioActividad from "./formulario-actividad";
 import FormularioCrearExamen from "./formulario-crear-examen";
 import FormularioConfiguracion from "./formulario-configuracion";
 import BotonTomarAsistencia from "./boton-tomar-asistencia";
+import BotonEliminarSesion from "./boton-eliminar-sesion";
 import TarjetaTarea from "./tarjeta-tarea";
 import TarjetaExamen from "./tarjeta-examen";
+import { eliminarSesionAsistencia } from "./actions";
 
 export default async function DetalleCursoDocente({
   params,
@@ -290,17 +292,32 @@ export default async function DetalleCursoDocente({
                 ausentes: 0,
                 justificados: 0,
               };
+              const fechaLegible = new Date(
+                `${sesion.fecha}T00:00:00`
+              ).toLocaleDateString("es-MX", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              });
+              const eliminarSesionAction = eliminarSesionAsistencia.bind(
+                null,
+                curso.id,
+                sesion.id
+              );
               return (
                 <li key={sesion.id} className="card p-4">
-                  <Link
-                    href={`/docente/cursos/${curso.id}/asistencia/${sesion.fecha}`}
-                    className="font-medium text-ink hover:underline"
-                  >
-                    {new Date(`${sesion.fecha}T00:00:00`).toLocaleDateString(
-                      "es-MX",
-                      { year: "numeric", month: "long", day: "numeric" }
-                    )}
-                  </Link>
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      href={`/docente/cursos/${curso.id}/asistencia/${sesion.fecha}`}
+                      className="font-medium text-ink hover:underline"
+                    >
+                      {fechaLegible}
+                    </Link>
+                    <BotonEliminarSesion
+                      accion={eliminarSesionAction}
+                      fechaLegible={fechaLegible}
+                    />
+                  </div>
                   <p className="mt-1 text-xs text-ink/70">
                     {conteo.presentes} presentes · {conteo.ausentes} ausentes ·{" "}
                     {conteo.justificados} justificados

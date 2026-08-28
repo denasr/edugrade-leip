@@ -576,3 +576,19 @@ export async function eliminarActividad(
 
   revalidatePath(`/docente/cursos/${cursoId}`);
 }
+
+export async function eliminarSesionAsistencia(
+  cursoId: string,
+  sesionId: string,
+  _formData: FormData
+) {
+  const supabase = await createClient();
+
+  // RLS (sesiones_asistencia_delete_docente) restringe esto al docente dueño
+  // del curso; el on delete cascade de asistencias.sesion_id se encarga de
+  // los registros de cada estudiante para esa fecha (a su vez permitido por
+  // asistencias_delete_docente, que evalúa RLS igual que un delete directo).
+  await supabase.from("sesiones_asistencia").delete().eq("id", sesionId);
+
+  revalidatePath(`/docente/cursos/${cursoId}`);
+}

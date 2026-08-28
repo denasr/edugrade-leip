@@ -129,6 +129,14 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `.xlsx` no puede reproducir el color aparte que usa la pantalla. Nombre del archivo:
   `calificaciones-{slug-del-curso}-{fecha-de-hoy}.xlsx`, con el slug sin acentos ni
   caracteres especiales para que el header `Content-Disposition` no tenga problemas.
+- **Eliminar una sesión de asistencia.** Botón "Eliminar" junto a cada fecha ya tomada en
+  `/docente/cursos/[id]` (sección Asistencia), con `confirm()` nativo — mismo patrón que
+  `BotonEliminarActividad`. Borra la fila de `sesiones_asistencia`; el `on delete cascade`
+  de `asistencias.sesion_id` se encarga de los registros de cada estudiante para esa fecha,
+  sin que la app tenga que borrarlos aparte. Solo edita/borra, no hay edición de una sesión
+  existente (cambiar quién estuvo presente ese día) — para eso hay que borrar y volver a
+  tomar asistencia. El % de asistencia y la nota final no necesitan ningún ajuste aparte: se
+  calculan al vuelo desde `asistencias` en cada carga, nunca se guarda un valor fijo.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
@@ -286,9 +294,11 @@ create table asistencias (
 - La inscripción a un curso se hace por clave de acceso (no se expone la lista completa de
   claves de acceso a estudiantes fuera del curso).
 - `sesiones_asistencia` y `asistencias`: solo el docente dueño del curso tiene policy de
-  lectura/escritura. El estudiante no tiene policy de lectura sobre estas tablas — su propia
-  asistencia se calcula server-side con la secret key (ver "Lecturas protegidas" arriba), a
-  propósito en vez de agregar una policy nueva.
+  lectura/escritura/borrado (incluye `delete`, agregado en la migración `20260828120000` —
+  antes de esa migración ninguna de las dos tablas tenía policy de `delete`, para nadie). El
+  estudiante no tiene policy de lectura sobre estas tablas — su propia asistencia se calcula
+  server-side con la secret key (ver "Lecturas protegidas" arriba), a propósito en vez de
+  agregar una policy nueva.
 - `preguntas_examen` sigue sin ninguna policy (inaccesible salvo secret key); la vista
   `preguntas_examen_estudiante` (sin la columna `correcta`) es lo único que un estudiante
   puede leer directamente para responder un examen.
