@@ -322,7 +322,7 @@ export default async function DetalleCursoEstudiante({
                   </div>
 
                   {actividad.instrucciones && (
-                    <p className="mt-1 text-sm text-ink/70">
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink/70">
                       {actividad.instrucciones}
                     </p>
                   )}

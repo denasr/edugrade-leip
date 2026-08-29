@@ -83,7 +83,9 @@ export default function TarjetaTarea({
       </Link>
 
       {actividad.instrucciones && (
-        <p className="mt-1 text-sm text-ink/70">{actividad.instrucciones}</p>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-ink/70">
+          {actividad.instrucciones}
+        </p>
       )}
 
       <p className="mt-2 text-xs text-ink/70">
