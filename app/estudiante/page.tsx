@@ -49,30 +49,34 @@ export default async function PanelEstudiante() {
       {!inscripciones || inscripciones.length === 0 ? (
         <FormularioInscripcion />
       ) : (
-        <section className="w-full max-w-sm">
-          <h2 className="font-title text-xl text-verde-bosque">
-            Mis cursos
-          </h2>
-          <ul className="mt-4 flex flex-col gap-3">
-            {inscripciones.map((inscripcion) => {
-              const curso = inscripcion.cursos;
-              if (!curso) return null;
-              return (
-                <li
-                  key={inscripcion.id}
-                  className="card p-4 transition-shadow hover:shadow-md"
-                >
-                  <Link href={`/estudiante/cursos/${curso.id}`}>
-                    <p className="font-medium text-ink">{curso.nombre}</p>
-                    <p className="text-sm text-ink/70">
-                      {curso.grupo} · {curso.periodo}
-                    </p>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        <>
+          <FormularioInscripcion mostrarBotonToggle />
+
+          <section className="w-full max-w-sm">
+            <h2 className="font-title text-xl text-verde-bosque">
+              Mis cursos
+            </h2>
+            <ul className="mt-4 flex flex-col gap-3">
+              {inscripciones.map((inscripcion) => {
+                const curso = inscripcion.cursos;
+                if (!curso) return null;
+                return (
+                  <li
+                    key={inscripcion.id}
+                    className="card p-4 transition-shadow hover:shadow-md"
+                  >
+                    <Link href={`/estudiante/cursos/${curso.id}`}>
+                      <p className="font-medium text-ink">{curso.nombre}</p>
+                      <p className="text-sm text-ink/70">
+                        {curso.grupo} · {curso.periodo}
+                      </p>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        </>
       )}
     </main>
   );

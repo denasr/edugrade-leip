@@ -137,6 +137,19 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   existente (cambiar quién estuvo presente ese día) — para eso hay que borrar y volver a
   tomar asistencia. El % de asistencia y la nota final no necesitan ningún ajuste aparte: se
   calculan al vuelo desde `asistencias` en cada carga, nunca se guarda un valor fijo.
+- **Un estudiante puede unirse a varios cursos.** `FormularioInscripcion`
+  (`app/estudiante/formulario-inscripcion.tsx`) es el mismo formulario en ambos casos —
+  cuando el estudiante no tiene ningún curso se muestra directo, y cuando ya tiene al menos
+  uno se muestra colapsado detrás de un botón "+ Unirme a otro curso" (prop
+  `mostrarBotonToggle`, mismo patrón de expandir/colapsar que `FormularioCurso` en el panel
+  del docente). No hay límite de cursos por estudiante. El RPC `inscribirse_a_curso` (único
+  camino para inscribirse, `security definer`, ver "Inscripción por clave de acceso" en la
+  migración inicial) antes usaba `on conflict do nothing` cuando el estudiante ya estaba
+  inscrito — no fallaba ni avisaba, el formulario se quedaba sin ningún mensaje. Desde la
+  migración `20260828130000` verifica la inscripción existente antes del insert y hace
+  `raise exception 'Ya estás inscrito en este curso'`, mismo mecanismo que ya usaba "Clave
+  de acceso inválida". `clave_acceso` es única por curso y no expira ni rota — no hay
+  ninguna lógica de vencimiento en el esquema.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
