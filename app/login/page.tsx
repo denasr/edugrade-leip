@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -44,7 +45,36 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-16">
+    <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4 py-16">
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/virtualgrade-icono.png"
+            alt=""
+            width={384}
+            height={384}
+            className="h-14 w-14"
+            priority
+          />
+          <Image
+            src="/virtualgrade-wordmark.png"
+            alt="Virtual Grade"
+            width={530}
+            height={80}
+            className="h-9 w-auto"
+            priority
+          />
+        </div>
+        <Image
+          src="/virtualgrade-eslogan.png"
+          alt="Evalúa · Sigue · Logra"
+          width={530}
+          height={28}
+          className="h-3 w-auto"
+          priority
+        />
+      </div>
+
       <form onSubmit={handleSubmit} className="card w-full max-w-sm p-6">
         <h1 className="font-title text-2xl text-verde-bosque">
           Iniciar sesión

@@ -1,4 +1,4 @@
-# CLAUDE.md — EduGrade LEIP
+# CLAUDE.md — Virtual Grade
 
 ## Qué es esto
 Plataforma de tareas, exámenes y asistencia para grupos de LEIP (UPN Unidad 321 Zacatecas).
@@ -158,9 +158,24 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   variantes `dark:` — un solo tema, por decisión explícita. Clases compartidas
   (`.card`, `.btn-primary`, `.btn-accent`, `.input`, `.badge-*`, `.toast`, etc.) en el mismo
   `globals.css`, para no repetir utilidades sueltas en cada archivo.
+- **Rebranding a "Virtual Grade".** El nombre visible cambió de "EduGrade LEIP" a "Virtual
+  Grade" con eslogan "EVALÚA · SIGUE · LOGRA" — solo de cara al usuario (metadata.title,
+  header, login, README, este archivo). No cambió el repo de GitHub, el proyecto de Vercel,
+  el proyecto de Supabase, ni ninguna referencia técnica interna (`package.json` sigue
+  siendo `edugrade-leip`, las migraciones viejas conservan su comentario original). Logo en
+  `public/virtualgrade-{icono,wordmark,eslogan}.png` (fondo transparente) más
+  `app/icon.png` (copia de `virtualgrade-icono.png`, convención de Next.js para favicon —
+  reemplazó al `app/favicon.ico` genérico que traía el proyecto). `--color-verde-bosque` se
+  actualizó de `#1f3b2e` a `#244a38` para calzar con el verde exacto del logo (pasa AA con
+  margen de sobra en todos sus usos, 8.4–9.9:1); `--color-calificado` se actualizó junto con
+  él porque por diseño replica ese mismo hex. El dorado del logo (`#b99c6b`) **no** se agregó
+  como token — sobre `crema`/blanco da 2.3–2.6:1, muy por debajo de AA, y `terracota` ya
+  cumple doble función de acento y color semántico de error/destructivo en 22 usos como
+  texto; el dorado vive únicamente dentro de los PNG del wordmark y el eslogan, nunca en
+  Tailwind. `terracota` no se tocó en absoluto.
 - **Contraste de texto (AA de WCAG).** Auditado con `axe-core` vía Playwright contra las
-  pantallas principales; texto normal cumple 4.5:1. `crema`, `verde-bosque` y `terracota`
-  no se tocaron — pasan en todos sus usos reales (`terracota` sobre una tarjeta blanca da
+  pantallas principales; texto normal cumple 4.5:1. En su momento `crema`, `verde-bosque` y
+  `terracota` no se tocaron — pasaban en todos sus usos reales (`terracota` sobre una tarjeta blanca da
   4.92; sobre `crema` directo, sin tarjeta de por medio, da 4.28 y no cumpliría, pero esa
   combinación no se usa hoy en ninguna pantalla — si se llega a necesitar texto terracota
   directo sobre el fondo `crema` del `<main>`, hay que revisar el tono en ese momento).

@@ -20,7 +20,7 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EduGrade LEIP",
+  title: "Virtual Grade",
   description: "Tareas y evaluaciones para grupos de LEIP — UPN Unidad 321 Zacatecas",
 };
 

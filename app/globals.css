@@ -10,7 +10,7 @@
   --color-foreground: var(--foreground);
 
   --color-crema: #f4efde;
-  --color-verde-bosque: #1f3b2e;
+  --color-verde-bosque: #244a38;
   --color-terracota: #b5533c;
   --color-ink: #2a2a24;
   --color-superficie: #ffffff;
@@ -18,7 +18,7 @@
   --color-abierta: #7d5a1e;
   --color-cerrada: #635c50;
   --color-pendiente: #b5533c;
-  --color-calificado: #1f3b2e;
+  --color-calificado: #244a38;
 
   --font-title: var(--font-source-serif);
   --font-sans: var(--font-inter);
