@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 
 export type EstadoEntrega = { error: string | null };
 export type EstadoExamen = { error: string | null };
@@ -65,14 +66,18 @@ export async function entregarTarea(
     };
   }
 
-  const storagePath = `${entrega.id}/${archivo.name}`;
+  // entrega.id (uuid) como carpeta ya evita colisiones entre estudiantes;
+  // el nombre en sí necesita sanearse porque Supabase Storage rechaza
+  // ciertos caracteres (espacios, acentos, paréntesis) con "Invalid key".
+  const storagePath = `${entrega.id}/${nombreArchivoSeguro(archivo.name)}`;
   const { error: errorSubida } = await supabase.storage
     .from("archivos-entrega")
     .upload(storagePath, archivo, { contentType: archivo.type });
 
   if (errorSubida) {
+    console.error("Error al subir archivo de entrega:", errorSubida);
     await supabase.from("entregas").delete().eq("id", entrega.id);
-    return { error: `No se pudo subir el archivo: ${errorSubida.message}` };
+    return { error: "No se pudo subir el archivo. Intenta de nuevo." };
   }
 
   const { error: errorArchivo } = await supabase

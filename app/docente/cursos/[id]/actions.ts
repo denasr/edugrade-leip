@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 
 export type EstadoActividad = { error: string | null };
 export type EstadoConfiguracion = { error: string | null };
@@ -124,15 +125,19 @@ export async function crearActividad(
   }
 
   if (archivoFile) {
-    const storagePath = `${cursoId}/${actividad.id}/${archivoFile.name}`;
+    // actividad.id (uuid) como carpeta ya evita colisiones; el nombre en sí
+    // necesita sanearse porque Supabase Storage rechaza ciertos caracteres
+    // (espacios, acentos, paréntesis) con "Invalid key".
+    const storagePath = `${cursoId}/${actividad.id}/${nombreArchivoSeguro(archivoFile.name)}`;
 
     const { error: errorSubida } = await supabase.storage
       .from("materiales-actividades")
       .upload(storagePath, archivoFile, { contentType: archivoFile.type });
 
     if (errorSubida) {
+      console.error("Error al subir material de actividad:", errorSubida);
       await supabase.from("actividades").delete().eq("id", actividad.id);
-      return { error: `No se pudo subir el archivo: ${errorSubida.message}` };
+      return { error: "No se pudo subir el archivo. Intenta de nuevo." };
     }
 
     const { error: errorMaterial } = await supabase
@@ -233,16 +238,15 @@ export async function editarActividad(
     }
 
     if (archivoFile) {
-      const storagePath = `${cursoId}/${actividadId}/${archivoFile.name}`;
+      const storagePath = `${cursoId}/${actividadId}/${nombreArchivoSeguro(archivoFile.name)}`;
 
       const { error: errorSubida } = await supabase.storage
         .from("materiales-actividades")
         .upload(storagePath, archivoFile, { contentType: archivoFile.type });
 
       if (errorSubida) {
-        return {
-          error: `No se pudo subir el archivo: ${errorSubida.message}`,
-        };
+        console.error("Error al subir material de actividad:", errorSubida);
+        return { error: "No se pudo subir el archivo. Intenta de nuevo." };
       }
 
       const { error: errorMaterial } = await supabase
