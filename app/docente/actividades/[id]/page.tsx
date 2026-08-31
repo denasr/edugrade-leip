@@ -86,10 +86,17 @@ export default async function DetalleActividadDocente({
       let enlaceDescarga: string | null = null;
 
       if (archivo) {
-        const { data } = await supabase.storage
-          .from("archivos-entrega")
-          .createSignedUrl(archivo.storage_path, 60 * 10);
-        enlaceDescarga = data?.signedUrl ?? null;
+        // No debe tronar toda la página si Storage falla (red, timeout):
+        // sin enlace de descarga es degradación aceptable, un 500 no.
+        try {
+          const { data, error } = await supabase.storage
+            .from("archivos-entrega")
+            .createSignedUrl(archivo.storage_path, 60 * 10);
+          if (error) console.error("Error al firmar URL de entrega:", error);
+          enlaceDescarga = data?.signedUrl ?? null;
+        } catch (err) {
+          console.error("Excepción al firmar URL de entrega:", err);
+        }
       }
 
       return {
