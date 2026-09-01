@@ -8,9 +8,10 @@ import FormularioCrearExamen from "./formulario-crear-examen";
 import FormularioConfiguracion from "./formulario-configuracion";
 import BotonTomarAsistencia from "./boton-tomar-asistencia";
 import BotonEliminarSesion from "./boton-eliminar-sesion";
+import ModalEliminarEstudiante from "./modal-eliminar-estudiante";
 import TarjetaTarea from "./tarjeta-tarea";
 import TarjetaExamen from "./tarjeta-examen";
-import { eliminarSesionAsistencia } from "./actions";
+import { eliminarEstudianteDeCurso, eliminarSesionAsistencia } from "./actions";
 
 export default async function DetalleCursoDocente({
   params,
@@ -125,6 +126,48 @@ export default async function DetalleCursoDocente({
     statsPorExamen.set(entrega.actividad_id, actual);
   }
 
+  // Lista de estudiantes inscritos, para poder eliminarlos individualmente
+  // del curso (inscripción por error). Mismo patrón de dos consultas que ya
+  // usa la toma de asistencia: inscripciones no tiene FK directa a
+  // perfiles (ambas apuntan a auth.users, pero no entre sí), así que no se
+  // puede embeber en una sola llamada.
+  const { data: inscripciones } = await supabase
+    .from("inscripciones")
+    .select("estudiante_id")
+    .eq("curso_id", id);
+
+  const estudianteIds = (inscripciones ?? []).map((i) => i.estudiante_id);
+
+  const { data: perfilesEstudiantes } =
+    estudianteIds.length > 0
+      ? await supabase
+          .from("perfiles")
+          .select("id, nombre_completo")
+          .in("id", estudianteIds)
+          .order("nombre_completo", { ascending: true })
+      : { data: [] };
+
+  // El correo no vive en perfiles, solo en auth.users, sin RLS accesible
+  // desde el cliente normal. Ya se verificó arriba (con el cliente normal)
+  // que quien pide esto es el docente dueño del curso, y estos IDs ya
+  // salieron de inscripciones filtradas por ese mismo curso — así que aquí
+  // se usa la secret key nada más para leer el correo puntual de cada uno,
+  // mismo patrón que preguntas_examen/asistencia (ver CLAUDE.md).
+  const admin = createAdminClient();
+  const correoPorId = new Map<string, string>();
+  await Promise.all(
+    estudianteIds.map(async (estudianteId) => {
+      const { data } = await admin.auth.admin.getUserById(estudianteId);
+      if (data.user?.email) correoPorId.set(estudianteId, data.user.email);
+    })
+  );
+
+  const estudiantesInscritos = (perfilesEstudiantes ?? []).map((p) => ({
+    id: p.id,
+    nombre_completo: p.nombre_completo,
+    correo: correoPorId.get(p.id) ?? "—",
+  }));
+
   const { data: sesionesAsistencia } = await supabase
     .from("sesiones_asistencia")
     .select("id, fecha")
@@ -214,6 +257,44 @@ export default async function DetalleCursoDocente({
           porcentaje_asistencia: curso.porcentaje_asistencia,
         }}
       />
+
+      <section className="w-full max-w-sm">
+        <h2 className="font-title text-xl text-verde-bosque">
+          Estudiantes inscritos
+        </h2>
+
+        {estudiantesInscritos.length === 0 ? (
+          <p className="mt-4 text-sm text-ink/70">
+            Todavía no hay estudiantes inscritos en este curso.
+          </p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-3">
+            {estudiantesInscritos.map((estudiante) => (
+              <li
+                key={estudiante.id}
+                className="card flex items-center justify-between gap-3 p-4"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-ink">
+                    {estudiante.nombre_completo}
+                  </p>
+                  <p className="truncate text-sm text-ink/70">
+                    {estudiante.correo}
+                  </p>
+                </div>
+                <ModalEliminarEstudiante
+                  accion={eliminarEstudianteDeCurso.bind(
+                    null,
+                    curso.id,
+                    estudiante.id
+                  )}
+                  nombreCompleto={estudiante.nombre_completo}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <FormularioActividad cursoId={curso.id} />
 

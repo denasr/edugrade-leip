@@ -581,6 +581,107 @@ export async function eliminarActividad(
   revalidatePath(`/docente/cursos/${cursoId}`);
 }
 
+export async function eliminarEstudianteDeCurso(
+  cursoId: string,
+  estudianteId: string,
+  _formData: FormData
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  // Confirma con el cliente normal (RLS) que quien llama es el docente
+  // dueño del curso, antes de tocar nada — el RPC de abajo repite este
+  // mismo chequeo (para no depender solo de esto), pero hacerlo aquí
+  // primero da un mensaje de error temprano y evita listar/borrar archivos
+  // de Storage si ni siquiera tiene permiso sobre el curso.
+  const { data: curso } = await supabase
+    .from("cursos")
+    .select("id")
+    .eq("id", cursoId)
+    .eq("docente_id", user.id)
+    .maybeSingle();
+
+  if (!curso) {
+    return { error: "No tienes permiso sobre este curso." };
+  }
+
+  // Junta las rutas de Storage de las entregas de este estudiante en este
+  // curso ANTES de tocar nada, porque en cuanto corra la fase 2 (más abajo)
+  // ya no va a existir la fila de archivos_entrega que las apunta. Solo
+  // lee, no borra nada todavía.
+  const { data: entregas } = await supabase
+    .from("entregas")
+    .select("id, actividades!inner(curso_id), archivos_entrega(storage_path)")
+    .eq("estudiante_id", estudianteId)
+    .eq("actividades.curso_id", cursoId);
+
+  const storagePaths = (entregas ?? []).flatMap(
+    (e) => e.archivos_entrega?.map((a) => a.storage_path) ?? []
+  );
+
+  // Fase 1 (transacción atómica): evaluaciones, respuestas_examen,
+  // archivos_entrega. Deliberadamente NO borra `entregas` todavía — la
+  // policy de Storage (storage_entregas_delete_docente) necesita que esa
+  // fila siga existiendo para autorizar el storage.remove() de abajo. Ver
+  // el comentario en la migración
+  // 20260901120000_add_eliminar_estudiante_de_curso.sql: con un solo RPC
+  // que también borrara `entregas`, el storage.remove() posterior fallaba
+  // en silencio (0 archivos borrados, sin error) porque la policy ya no
+  // encontraba la fila para verificar al dueño — confirmado en vivo.
+  const { error: errorFase1 } = await supabase.rpc(
+    "eliminar_estudiante_de_curso_datos",
+    { p_curso_id: cursoId, p_estudiante_id: estudianteId }
+  );
+
+  if (errorFase1) {
+    console.error("Error al eliminar datos del estudiante (fase 1):", errorFase1);
+    return { error: "No se pudo eliminar al estudiante. Intenta de nuevo." };
+  }
+
+  // Borrado de Storage: corre con la fila `entregas` todavía viva (la fase
+  // 2, que la borra, todavía no se ha llamado). No fatal si falla — mismo
+  // razonamiento de siempre: es preferible terminar de quitar al
+  // estudiante del curso a dejarlo a medias por un archivo que de todas
+  // formas ya no tiene ninguna fila que lo apunte.
+  if (storagePaths.length > 0) {
+    const { error: errorStorage } = await supabase.storage
+      .from("archivos-entrega")
+      .remove(storagePaths);
+    if (errorStorage) {
+      console.error(
+        "Error al borrar archivos de Storage al eliminar estudiante:",
+        errorStorage
+      );
+    }
+  }
+
+  // Fase 2 (transacción atómica): entregas, inscripciones. Va al final,
+  // después del intento de borrado de Storage (exitoso o no).
+  const { error: errorFase2 } = await supabase.rpc(
+    "eliminar_estudiante_de_curso_final",
+    { p_curso_id: cursoId, p_estudiante_id: estudianteId }
+  );
+
+  if (errorFase2) {
+    console.error("Error al eliminar estudiante del curso (fase 2):", errorFase2);
+    return {
+      error:
+        "Se eliminaron sus calificaciones y archivos, pero no se pudo completar el resto. Intenta de nuevo.",
+    };
+  }
+
+  revalidatePath("/docente");
+  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidatePath(`/docente/cursos/${cursoId}/calificaciones`);
+  return { error: null };
+}
+
 export async function eliminarSesionAsistencia(
   cursoId: string,
   sesionId: string,
