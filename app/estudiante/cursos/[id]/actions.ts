@@ -22,81 +22,95 @@ export async function entregarTarea(
   _estadoPrevio: EstadoEntrega,
   formData: FormData
 ): Promise<EstadoEntrega> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Todas las llamadas a Supabase de aquí abajo ya verifican su `error` de
+  // respuesta (caso esperado: clave duplicada, RLS, etc.), pero ninguna
+  // estaba protegida contra una excepción real (timeout, conexión
+  // reseteada entre la función serverless y Supabase) — eso se saltaba
+  // todos esos checks y tronaba toda la pantalla vía error.tsx. Con este
+  // try/catch, ese caso también regresa un {error} amigable y la
+  // estudiante se queda en la misma pantalla en vez de perderla.
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
-  }
-
-  const comentario = String(formData.get("comentario") ?? "").trim();
-  const archivo = formData.get("archivo");
-
-  if (!(archivo instanceof File) || archivo.size === 0) {
-    return { error: "Adjunta un archivo para entregar la tarea." };
-  }
-
-  if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
-    return { error: "Formato no permitido. Usa PDF, DOCX, JPG o PNG." };
-  }
-  if (archivo.size > TAMANO_MAXIMO_BYTES) {
-    return { error: "El archivo supera el máximo de 10 MB." };
-  }
-
-  const { data: entrega, error: errorInsert } = await supabase
-    .from("entregas")
-    .insert({
-      actividad_id: actividadId,
-      estudiante_id: user.id,
-      comentario_estudiante: comentario || null,
-    })
-    .select("id")
-    .single();
-
-  if (errorInsert || !entrega) {
-    if (errorInsert?.code === "23505") {
-      return { error: "Ya entregaste esta tarea." };
+    if (!user) {
+      return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
     }
+
+    const comentario = String(formData.get("comentario") ?? "").trim();
+    const archivo = formData.get("archivo");
+
+    if (!(archivo instanceof File) || archivo.size === 0) {
+      return { error: "Adjunta un archivo para entregar la tarea." };
+    }
+
+    if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
+      return { error: "Formato no permitido. Usa PDF, DOCX, JPG o PNG." };
+    }
+    if (archivo.size > TAMANO_MAXIMO_BYTES) {
+      return { error: "El archivo supera el máximo de 10 MB." };
+    }
+
+    const { data: entrega, error: errorInsert } = await supabase
+      .from("entregas")
+      .insert({
+        actividad_id: actividadId,
+        estudiante_id: user.id,
+        comentario_estudiante: comentario || null,
+      })
+      .select("id")
+      .single();
+
+    if (errorInsert || !entrega) {
+      if (errorInsert?.code === "23505") {
+        return { error: "Ya entregaste esta tarea." };
+      }
+      return {
+        error:
+          errorInsert?.message ??
+          "No se pudo registrar la entrega. Verifica que la tarea siga abierta.",
+      };
+    }
+
+    // entrega.id (uuid) como carpeta ya evita colisiones entre estudiantes;
+    // el nombre en sí necesita sanearse porque Supabase Storage rechaza
+    // ciertos caracteres (espacios, acentos, paréntesis) con "Invalid key".
+    const storagePath = `${entrega.id}/${nombreArchivoSeguro(archivo.name)}`;
+    const { error: errorSubida } = await supabase.storage
+      .from("archivos-entrega")
+      .upload(storagePath, archivo, { contentType: archivo.type });
+
+    if (errorSubida) {
+      console.error("Error al subir archivo de entrega:", errorSubida);
+      await supabase.from("entregas").delete().eq("id", entrega.id);
+      return { error: "No se pudo subir el archivo. Intenta de nuevo." };
+    }
+
+    const { error: errorArchivo } = await supabase
+      .from("archivos_entrega")
+      .insert({
+        entrega_id: entrega.id,
+        nombre_archivo: archivo.name,
+        storage_path: storagePath,
+        tamano_bytes: archivo.size,
+      });
+
+    if (errorArchivo) {
+      await supabase.storage.from("archivos-entrega").remove([storagePath]);
+      await supabase.from("entregas").delete().eq("id", entrega.id);
+      return { error: errorArchivo.message };
+    }
+
+    revalidatePath(`/estudiante/cursos/${cursoId}`);
+    return { error: null };
+  } catch (err) {
+    console.error("Excepción inesperada en entregarTarea:", err);
     return {
-      error:
-        errorInsert?.message ??
-        "No se pudo registrar la entrega. Verifica que la tarea siga abierta.",
+      error: "No se pudo entregar la tarea. Intenta de nuevo en un momento.",
     };
   }
-
-  // entrega.id (uuid) como carpeta ya evita colisiones entre estudiantes;
-  // el nombre en sí necesita sanearse porque Supabase Storage rechaza
-  // ciertos caracteres (espacios, acentos, paréntesis) con "Invalid key".
-  const storagePath = `${entrega.id}/${nombreArchivoSeguro(archivo.name)}`;
-  const { error: errorSubida } = await supabase.storage
-    .from("archivos-entrega")
-    .upload(storagePath, archivo, { contentType: archivo.type });
-
-  if (errorSubida) {
-    console.error("Error al subir archivo de entrega:", errorSubida);
-    await supabase.from("entregas").delete().eq("id", entrega.id);
-    return { error: "No se pudo subir el archivo. Intenta de nuevo." };
-  }
-
-  const { error: errorArchivo } = await supabase
-    .from("archivos_entrega")
-    .insert({
-      entrega_id: entrega.id,
-      nombre_archivo: archivo.name,
-      storage_path: storagePath,
-      tamano_bytes: archivo.size,
-    });
-
-  if (errorArchivo) {
-    await supabase.storage.from("archivos-entrega").remove([storagePath]);
-    await supabase.from("entregas").delete().eq("id", entrega.id);
-    return { error: errorArchivo.message };
-  }
-
-  revalidatePath(`/estudiante/cursos/${cursoId}`);
-  return { error: null };
 }
 
 export async function presentarExamen(
