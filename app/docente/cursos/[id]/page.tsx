@@ -8,10 +8,10 @@ import FormularioCrearExamen from "./formulario-crear-examen";
 import FormularioConfiguracion from "./formulario-configuracion";
 import BotonTomarAsistencia from "./boton-tomar-asistencia";
 import BotonEliminarSesion from "./boton-eliminar-sesion";
-import ModalEliminarEstudiante from "./modal-eliminar-estudiante";
+import ListaEstudiantes from "./lista-estudiantes";
 import TarjetaTarea from "./tarjeta-tarea";
 import TarjetaExamen from "./tarjeta-examen";
-import { eliminarEstudianteDeCurso, eliminarSesionAsistencia } from "./actions";
+import { eliminarSesionAsistencia } from "./actions";
 
 export default async function DetalleCursoDocente({
   params,
@@ -258,43 +258,7 @@ export default async function DetalleCursoDocente({
         }}
       />
 
-      <section className="w-full max-w-sm">
-        <h2 className="font-title text-xl text-verde-bosque">
-          Estudiantes inscritos
-        </h2>
-
-        {estudiantesInscritos.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/70">
-            Todavía no hay estudiantes inscritos en este curso.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {estudiantesInscritos.map((estudiante) => (
-              <li
-                key={estudiante.id}
-                className="card flex items-center justify-between gap-3 p-4"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-ink">
-                    {estudiante.nombre_completo}
-                  </p>
-                  <p className="truncate text-sm text-ink/70">
-                    {estudiante.correo}
-                  </p>
-                </div>
-                <ModalEliminarEstudiante
-                  accion={eliminarEstudianteDeCurso.bind(
-                    null,
-                    curso.id,
-                    estudiante.id
-                  )}
-                  nombreCompleto={estudiante.nombre_completo}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <ListaEstudiantes cursoId={curso.id} estudiantes={estudiantesInscritos} />
 
       <FormularioActividad cursoId={curso.id} />
 
