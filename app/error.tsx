@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 // Red de seguridad para cualquier excepción sin capturar en un Server
 // Component bajo el layout raíz (páginas, layouts anidados). Sin este
@@ -17,6 +18,7 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
