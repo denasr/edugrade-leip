@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { estadoActividad, textoRelativoCierre } from "@/lib/actividades";
 import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioActividad from "./formulario-actividad";
@@ -27,7 +28,14 @@ export default function TarjetaTarea({
   cursoId: string;
   conteo: { total: number; pendientes: number };
 }) {
+  const estado = estadoActividad(actividad);
   const [editando, setEditando] = useState(false);
+  // Colapsada por default solo si ya está cerrada — ahorra espacio en
+  // cursos con muchas tareas viejas sin esconder nada: un clic la abre a
+  // la tarjeta completa de siempre, con Editar/Bloquear/Eliminar incluidos
+  // (esos botones no existen en ningún otro lado, así que nunca deben
+  // quedar inalcanzables).
+  const [abierta, setAbierta] = useState(estado !== "CERRADA");
 
   if (editando) {
     return (
@@ -48,7 +56,6 @@ export default function TarjetaTarea({
     );
   }
 
-  const estado = estadoActividad(actividad);
   const alternarBloqueoAction = alternarBloqueo.bind(
     null,
     cursoId,
@@ -61,6 +68,32 @@ export default function TarjetaTarea({
     actividad.id
   );
 
+  if (estado === "CERRADA" && !abierta) {
+    return (
+      <li>
+        <button
+          type="button"
+          onClick={() => setAbierta(true)}
+          aria-label={`Expandir ${actividad.titulo}`}
+          className="flex w-full items-center gap-2 rounded-full border border-verde-bosque/15 bg-superficie px-4 py-2.5 text-left shadow-sm shadow-verde-bosque/5"
+        >
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+            {actividad.titulo}
+          </span>
+          {conteo.pendientes > 0 && (
+            <span className="badge-pendiente shrink-0">
+              {conteo.pendientes} pendientes
+            </span>
+          )}
+          <ChevronDown
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-ink/50"
+          />
+        </button>
+      </li>
+    );
+  }
+
   return (
     <li className="card p-4">
       <div className="flex items-start justify-between gap-2">
@@ -70,9 +103,21 @@ export default function TarjetaTarea({
         >
           {actividad.titulo}
         </Link>
-        <span className={estado === "ABIERTA" ? "badge-abierta" : "badge-cerrada"}>
-          {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className={estado === "ABIERTA" ? "badge-abierta" : "badge-cerrada"}>
+            {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
+          </span>
+          {estado === "CERRADA" && (
+            <button
+              type="button"
+              onClick={() => setAbierta(false)}
+              aria-label={`Colapsar ${actividad.titulo}`}
+              className="text-ink/50"
+            >
+              <ChevronDown aria-hidden="true" className="h-4 w-4 rotate-180" />
+            </button>
+          )}
+        </div>
       </div>
 
       <Link

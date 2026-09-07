@@ -2,21 +2,15 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  estadoActividad,
-  motivoCierre,
-  compararPorCierre,
-  textoRelativoCierre,
-} from "@/lib/actividades";
+import { estadoActividad, compararPorCierre } from "@/lib/actividades";
 import {
   calcularCalificacionFinal,
   calcularPorcentajeAsistencia,
   promedioCalificaciones,
   textoNotaParcial,
 } from "@/lib/calificacion-final";
-import { IconoArchivo } from "@/lib/icono-archivo";
-import FormularioEntrega from "./formulario-entrega";
-import FormularioPresentarExamen from "./formulario-presentar-examen";
+import TarjetaTareaEstudiante from "./tarjeta-tarea-estudiante";
+import TarjetaExamenEstudiante from "./tarjeta-examen-estudiante";
 
 export default async function DetalleCursoEstudiante({
   params,
@@ -307,98 +301,13 @@ export default async function DetalleCursoEstudiante({
           </p>
         ) : (
           <ul className="mt-4 flex flex-col gap-3">
-            {actividadesConEnlace.map((actividad) => {
-              const estado = estadoActividad(actividad);
-              const evaluacion = actividad.entrega?.evaluaciones ?? null;
-              const archivoEntregado =
-                actividad.entrega?.archivos_entrega[0] ?? null;
-
-              return (
-                <li key={actividad.id} className="card p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-ink">{actividad.titulo}</p>
-                    <span
-                      className={
-                        estado === "ABIERTA"
-                          ? "badge-abierta"
-                          : "badge-cerrada"
-                      }
-                    >
-                      {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
-                    </span>
-                  </div>
-
-                  {actividad.instrucciones && (
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-ink/70">
-                      {actividad.instrucciones}
-                    </p>
-                  )}
-
-                  <p className="mt-2 text-xs text-ink/70">
-                    {actividad.fecha_apertura
-                      ? `Abre ${new Date(
-                          actividad.fecha_apertura
-                        ).toLocaleString("es-MX")} · `
-                      : ""}
-                    Cierra{" "}
-                    {new Date(actividad.fecha_cierre).toLocaleString("es-MX")}
-                    {" ("}
-                    {textoRelativoCierre(actividad.fecha_cierre)}
-                    {")"}
-                  </p>
-
-                  {actividad.enlaceDescarga && (
-                    <a
-                      href={actividad.enlaceDescarga}
-                      className="mt-2 flex items-center gap-1.5 text-sm font-medium text-verde-bosque hover:underline"
-                    >
-                      <IconoArchivo nombreArchivo={actividad.nombreArchivo ?? ""} />
-                      Descargar {actividad.nombreArchivo}
-                    </a>
-                  )}
-
-                  {actividad.entrega ? (
-                    <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
-                      <p className="flex items-center gap-1.5 text-ink/70">
-                        {archivoEntregado && (
-                          <IconoArchivo
-                            nombreArchivo={archivoEntregado.nombre_archivo}
-                          />
-                        )}
-                        Entregaste: {archivoEntregado?.nombre_archivo}
-                      </p>
-                      {actividad.entrega.comentario_estudiante && (
-                        <p className="mt-1 text-ink/70">
-                          Tu comentario: {actividad.entrega.comentario_estudiante}
-                        </p>
-                      )}
-                      {evaluacion ? (
-                        <div className="mt-2">
-                          <p className="font-medium text-ink">
-                            Calificación: {evaluacion.calificacion_final}/10
-                          </p>
-                          {evaluacion.comentarios && (
-                            <p className="mt-1 text-ink/70">
-                              {evaluacion.comentarios}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="badge-pendiente mt-2">
-                          Pendiente de calificar
-                        </span>
-                      )}
-                    </div>
-                  ) : estado === "ABIERTA" ? (
-                    <FormularioEntrega actividadId={actividad.id} cursoId={id} />
-                  ) : (
-                    <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/70">
-                      No se puede entregar. {motivoCierre(actividad)}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
+            {actividadesConEnlace.map((actividad) => (
+              <TarjetaTareaEstudiante
+                key={actividad.id}
+                actividad={actividad}
+                cursoId={id}
+              />
+            ))}
           </ul>
         )}
       </section>
@@ -412,70 +321,9 @@ export default async function DetalleCursoEstudiante({
           </p>
         ) : (
           <ul className="mt-4 flex flex-col gap-3">
-            {examenesConPreguntas.map((examen) => {
-              const estado = estadoActividad(examen);
-              const evaluacion = examen.entrega?.evaluaciones ?? null;
-
-              return (
-                <li key={examen.id} className="card p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-ink">{examen.titulo}</p>
-                    <span
-                      className={
-                        estado === "ABIERTA"
-                          ? "badge-abierta"
-                          : "badge-cerrada"
-                      }
-                    >
-                      {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
-                    </span>
-                  </div>
-
-                  {examen.instrucciones && (
-                    <p className="mt-1 text-sm text-ink/70">
-                      {examen.instrucciones}
-                    </p>
-                  )}
-
-                  <p className="mt-2 text-xs text-ink/70">
-                    {examen.fecha_apertura
-                      ? `Abre ${new Date(
-                          examen.fecha_apertura
-                        ).toLocaleString("es-MX")} · `
-                      : ""}
-                    Cierra{" "}
-                    {new Date(examen.fecha_cierre).toLocaleString("es-MX")}
-                    {" ("}
-                    {textoRelativoCierre(examen.fecha_cierre)}
-                    {")"}
-                  </p>
-
-                  {examen.entrega ? (
-                    <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
-                      {evaluacion ? (
-                        <p className="font-medium text-ink">
-                          Calificación: {evaluacion.calificacion_final}/10
-                        </p>
-                      ) : (
-                        <span className="badge-pendiente">
-                          Presentado, calificando…
-                        </span>
-                      )}
-                    </div>
-                  ) : estado === "ABIERTA" ? (
-                    <FormularioPresentarExamen
-                      actividadId={examen.id}
-                      cursoId={id}
-                      preguntas={examen.preguntas}
-                    />
-                  ) : (
-                    <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/70">
-                      No se puede presentar. {motivoCierre(examen)}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
+            {examenesConPreguntas.map((examen) => (
+              <TarjetaExamenEstudiante key={examen.id} examen={examen} cursoId={id} />
+            ))}
           </ul>
         )}
       </section>
