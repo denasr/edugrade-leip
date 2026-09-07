@@ -260,63 +260,73 @@ export default async function DetalleCursoDocente({
 
       <ListaEstudiantes cursoId={curso.id} estudiantes={estudiantesInscritos} />
 
-      <FormularioActividad cursoId={curso.id} />
+      {/* Tareas y exámenes lado a lado desde lg: cada columna conserva su
+          botón de crear + lista, igual que apiladas en móvil — el ancho de
+          cada max-w-sm interno (formularios) no cambia, solo se acomodan en
+          paralelo en vez de uno tras otro cuando hay espacio horizontal. */}
+      <div className="flex w-full max-w-sm flex-col gap-10 lg:max-w-4xl lg:flex-row lg:items-start lg:gap-8">
+        <div className="flex w-full flex-col items-center gap-10">
+          <FormularioActividad cursoId={curso.id} />
 
-      <section className="w-full max-w-sm">
-        <h2 className="font-title text-xl text-verde-bosque">Tareas</h2>
+          <section className="w-full">
+            <h2 className="font-title text-xl text-verde-bosque">Tareas</h2>
 
-        {!actividades || actividades.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/70">
-            Todavía no has creado ninguna tarea.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {actividades.map((actividad) => (
-              <TarjetaTarea
-                key={actividad.id}
-                actividad={actividad}
-                cursoId={curso.id}
-                conteo={
-                  conteosPorActividad.get(actividad.id) ?? {
-                    total: 0,
-                    pendientes: 0,
-                  }
-                }
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+            {!actividades || actividades.length === 0 ? (
+              <p className="mt-4 text-sm text-ink/70">
+                Todavía no has creado ninguna tarea.
+              </p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-3">
+                {actividades.map((actividad) => (
+                  <TarjetaTarea
+                    key={actividad.id}
+                    actividad={actividad}
+                    cursoId={curso.id}
+                    conteo={
+                      conteosPorActividad.get(actividad.id) ?? {
+                        total: 0,
+                        pendientes: 0,
+                      }
+                    }
+                  />
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
 
-      <FormularioCrearExamen cursoId={curso.id} />
+        <div className="flex w-full flex-col items-center gap-10">
+          <FormularioCrearExamen cursoId={curso.id} />
 
-      <section className="w-full max-w-sm">
-        <h2 className="font-title text-xl text-verde-bosque">Exámenes</h2>
+          <section className="w-full">
+            <h2 className="font-title text-xl text-verde-bosque">Exámenes</h2>
 
-        {!examenes || examenes.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/70">
-            Todavía no has creado ningún examen.
-          </p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {examenes.map((examen) => (
-              <TarjetaExamen
-                key={examen.id}
-                examen={examen}
-                cursoId={curso.id}
-                stats={
-                  statsPorExamen.get(examen.id) ?? {
-                    presentados: 0,
-                    sumaCalif: 0,
-                    conCalif: 0,
-                  }
-                }
-                preguntas={preguntasPorExamen.get(examen.id) ?? []}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+            {!examenes || examenes.length === 0 ? (
+              <p className="mt-4 text-sm text-ink/70">
+                Todavía no has creado ningún examen.
+              </p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-3">
+                {examenes.map((examen) => (
+                  <TarjetaExamen
+                    key={examen.id}
+                    examen={examen}
+                    cursoId={curso.id}
+                    stats={
+                      statsPorExamen.get(examen.id) ?? {
+                        presentados: 0,
+                        sumaCalif: 0,
+                        conCalif: 0,
+                      }
+                    }
+                    preguntas={preguntasPorExamen.get(examen.id) ?? []}
+                  />
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
 
       <section className="w-full max-w-sm">
         <h2 className="font-title text-xl text-verde-bosque">Asistencia</h2>

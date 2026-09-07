@@ -38,7 +38,7 @@ export default async function PanelDocente() {
 
       <FormularioCurso />
 
-      <section className="w-full max-w-sm">
+      <section className="w-full max-w-sm lg:max-w-4xl">
         <h2 className="font-title text-xl text-verde-bosque">Mis cursos</h2>
 
         {!cursos || cursos.length === 0 ? (
@@ -46,7 +46,7 @@ export default async function PanelDocente() {
             Todavía no has creado ningún curso.
           </p>
         ) : (
-          <ul className="mt-4 flex flex-col gap-3">
+          <ul className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
             {cursos.map((curso) => (
               <li
                 key={curso.id}

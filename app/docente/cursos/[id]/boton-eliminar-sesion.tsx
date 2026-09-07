@@ -1,5 +1,7 @@
 "use client";
 
+import BotonSubmitEliminar from "./boton-submit-eliminar";
+
 export default function BotonEliminarSesion({
   accion,
   fechaLegible,
@@ -9,21 +11,9 @@ export default function BotonEliminarSesion({
 }) {
   return (
     <form action={accion}>
-      <button
-        type="submit"
-        onClick={(e) => {
-          if (
-            !confirm(
-              `Esto eliminará la asistencia registrada de todos los estudiantes para el ${fechaLegible}. Esta acción no se puede deshacer. ¿Continuar?`
-            )
-          ) {
-            e.preventDefault();
-          }
-        }}
-        className="btn-text-accent"
-      >
-        Eliminar
-      </button>
+      <BotonSubmitEliminar
+        mensajeConfirmacion={`Esto eliminará la asistencia registrada de todos los estudiantes para el ${fechaLegible}. Esta acción no se puede deshacer. ¿Continuar?`}
+      />
     </form>
   );
 }

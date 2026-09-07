@@ -43,6 +43,14 @@ body {
     @apply inline-flex min-h-11 items-center justify-center rounded-full bg-terracota px-5 py-2.5 text-sm font-medium text-crema transition-colors hover:bg-terracota/90 disabled:opacity-50;
   }
 
+  /* Acción secundaria dentro de una misma pantalla (ej. "+ Nuevo examen"
+     junto a un btn-primary "+ Nueva tarea") — mismo verde-bosque que ya se
+     usa como texto sobre crema en los encabezados, sin auditoría de
+     contraste nueva que hacer. */
+  .btn-secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-full border-2 border-verde-bosque px-5 py-2.5 text-sm font-medium text-verde-bosque transition-colors hover:bg-verde-bosque/10 disabled:opacity-50;
+  }
+
   .btn-text-accent {
     @apply inline-flex min-h-11 items-center px-1 text-sm font-medium text-terracota transition-colors hover:text-terracota/80;
   }

@@ -1,5 +1,7 @@
 "use client";
 
+import BotonSubmitEliminar from "./boton-submit-eliminar";
+
 export default function BotonEliminarActividad({
   accion,
   titulo,
@@ -9,17 +11,9 @@ export default function BotonEliminarActividad({
 }) {
   return (
     <form action={accion}>
-      <button
-        type="submit"
-        onClick={(e) => {
-          if (!confirm(`¿Eliminar "${titulo}"? Esta acción no se puede deshacer.`)) {
-            e.preventDefault();
-          }
-        }}
-        className="btn-text-accent"
-      >
-        Eliminar
-      </button>
+      <BotonSubmitEliminar
+        mensajeConfirmacion={`¿Eliminar "${titulo}"? Esta acción no se puede deshacer.`}
+      />
     </form>
   );
 }

@@ -140,7 +140,7 @@ export default function FormularioCrearExamen({
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="btn-primary w-full max-w-sm"
+        className="btn-secondary w-full max-w-sm"
       >
         + Nuevo examen
       </button>
