@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Source_Serif_4, Inter, Space_Mono } from "next/font/google";
 import { ToastProvider } from "./toast-provider";
 import "./globals.css";
@@ -22,6 +22,10 @@ const spaceMono = Space_Mono({
 export const metadata: Metadata = {
   title: "Virtual Grade",
   description: "Tareas y evaluaciones para grupos de LEIP — UPN Unidad 321 Zacatecas",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#244a38",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
