@@ -8,6 +8,21 @@ import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 export type EstadoActividad = { error: string | null };
 export type EstadoConfiguracion = { error: string | null };
 
+// Ya no hay una sola pantalla /docente/cursos/[id] con todo junto — son 5
+// pestañas en rutas separadas (resumen, tareas, examenes, asistencia,
+// estudiantes), cada una mostrando el badge de "pendientes" en la franja
+// que ven las otras 4. Por eso cualquier cambio revalida las 5 juntas en
+// vez de solo la ruta donde ocurrió la acción — es la única forma de que
+// ese badge no se quede desactualizado en las pestañas que no se visitaron.
+function revalidarPestanasCurso(cursoId: string) {
+  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidatePath(`/docente/cursos/${cursoId}/tareas`);
+  revalidatePath(`/docente/cursos/${cursoId}/examenes`);
+  revalidatePath(`/docente/cursos/${cursoId}/asistencia`);
+  revalidatePath(`/docente/cursos/${cursoId}/estudiantes`);
+  revalidatePath(`/docente/cursos/${cursoId}/calificaciones`);
+}
+
 export async function actualizarConfiguracionCurso(
   cursoId: string,
   _estadoPrevio: EstadoConfiguracion,
@@ -55,7 +70,7 @@ export async function actualizarConfiguracionCurso(
     return { error: error.message };
   }
 
-  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidarPestanasCurso(cursoId);
   return { error: null };
 }
 
@@ -158,7 +173,7 @@ export async function crearActividad(
     }
   }
 
-  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidarPestanasCurso(cursoId);
   return { error: null };
 }
 
@@ -267,7 +282,7 @@ export async function editarActividad(
     }
   }
 
-  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidarPestanasCurso(cursoId);
   return { error: null };
 }
 
@@ -284,7 +299,7 @@ export async function alternarBloqueo(
     .update({ bloqueado_manual: nuevoValor })
     .eq("id", actividadId);
 
-  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidarPestanasCurso(cursoId);
 }
 
 type PreguntaEntrada = {
@@ -407,7 +422,7 @@ export async function crearExamen(
     return { error: errorPreguntas.message };
   }
 
-  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidarPestanasCurso(cursoId);
   return { error: null };
 }
 
@@ -554,7 +569,7 @@ export async function editarExamen(
     }
   }
 
-  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidarPestanasCurso(cursoId);
   return { error: null };
 }
 
@@ -578,7 +593,7 @@ export async function eliminarActividad(
 
   await supabase.from("actividades").delete().eq("id", actividadId);
 
-  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidarPestanasCurso(cursoId);
 }
 
 export async function eliminarEstudianteDeCurso(
@@ -677,8 +692,7 @@ export async function eliminarEstudianteDeCurso(
   }
 
   revalidatePath("/docente");
-  revalidatePath(`/docente/cursos/${cursoId}`);
-  revalidatePath(`/docente/cursos/${cursoId}/calificaciones`);
+  revalidarPestanasCurso(cursoId);
   return { error: null };
 }
 
@@ -695,5 +709,5 @@ export async function eliminarSesionAsistencia(
   // asistencias_delete_docente, que evalúa RLS igual que un delete directo).
   await supabase.from("sesiones_asistencia").delete().eq("id", sesionId);
 
-  revalidatePath(`/docente/cursos/${cursoId}`);
+  revalidarPestanasCurso(cursoId);
 }
