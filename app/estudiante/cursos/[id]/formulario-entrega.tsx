@@ -64,6 +64,13 @@ export default function FormularioEntrega({
           name="archivo"
           required
           accept=".pdf,.docx,.jpg,.jpeg,.png"
+          // Sin efecto en escritorio (el navegador lo ignora); en un
+          // celular le sugiere al navegador abrir la cámara directo en vez
+          // de solo el selector de archivos — el estudiante sigue pudiendo
+          // elegir "Galería" desde ese mismo selector si prefiere una foto
+          // ya tomada. No cambia nada del resto del flujo: llega como el
+          // mismo File de siempre a entregarTarea.
+          capture="environment"
           className="text-sm text-ink/70 file:mr-3 file:rounded-full file:border-0 file:bg-verde-bosque/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-verde-bosque"
         />
         <span className="text-xs text-ink/70">
