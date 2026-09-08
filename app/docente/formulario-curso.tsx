@@ -25,6 +25,10 @@ export default function FormularioCurso() {
   // Generada en el cliente para no chocar con el HTML del server durante la
   // hidratación (Math.random() daría valores distintos en cada lado).
   useEffect(() => {
+    // Excepción justificada: sin el efecto, servidor y cliente calcularían
+    // valores distintos con Math.random() durante el render y React
+    // reportaría un desajuste de hidratación real, no cosmético.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setClaveAcceso(generarClaveAcceso());
   }, []);
 
