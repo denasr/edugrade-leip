@@ -33,7 +33,7 @@ export default function TarjetaTareaEstudiante({
 }) {
   const estado = estadoActividad(actividad);
   const evaluacion = actividad.entrega?.evaluaciones ?? null;
-  const archivoEntregado = actividad.entrega?.archivos_entrega[0] ?? null;
+  const archivosEntregados = actividad.entrega?.archivos_entrega ?? [];
 
   // Colapsada por default solo si ya cerró — un clic la abre a la tarjeta
   // completa, así nunca se pierde acceso a la calificación/retroalimentación
@@ -114,12 +114,24 @@ export default function TarjetaTareaEstudiante({
 
       {actividad.entrega ? (
         <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
-          <p className="flex items-center gap-1.5 text-ink/70">
-            {archivoEntregado && (
-              <IconoArchivo nombreArchivo={archivoEntregado.nombre_archivo} />
-            )}
-            Entregaste: {archivoEntregado?.nombre_archivo}
-          </p>
+          {archivosEntregados.length === 1 ? (
+            <p className="flex items-center gap-1.5 text-ink/70">
+              <IconoArchivo nombreArchivo={archivosEntregados[0].nombre_archivo} />
+              Entregaste: {archivosEntregados[0].nombre_archivo}
+            </p>
+          ) : (
+            <div className="text-ink/70">
+              <p>Entregaste {archivosEntregados.length} archivos:</p>
+              <ul className="mt-1 flex flex-col gap-1">
+                {archivosEntregados.map((archivo, i) => (
+                  <li key={i} className="flex items-center gap-1.5">
+                    <IconoArchivo nombreArchivo={archivo.nombre_archivo} />
+                    {archivo.nombre_archivo}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {actividad.entrega.comentario_estudiante && (
             <p className="mt-1 text-ink/70">
               Tu comentario: {actividad.entrega.comentario_estudiante}

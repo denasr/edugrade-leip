@@ -5,6 +5,8 @@ import { entregarTarea, type EstadoEntrega } from "./actions";
 import { useToast } from "../../../toast-provider";
 
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
+const TAMANO_MAXIMO_TOTAL_BYTES = 30 * 1024 * 1024;
+const MAXIMO_ARCHIVOS = 10;
 
 const estadoInicial: EstadoEntrega = { error: null };
 
@@ -39,14 +41,34 @@ export default function FormularioEntrega({
     estadoInicial
   );
 
-  function validarArchivo(e: React.FormEvent<HTMLFormElement>) {
+  // Mismos límites que entregarTarea, repetidos aquí solo para avisar antes
+  // de enviar — la validación real y definitiva sigue siendo la del
+  // servidor, esto es nada más para no hacer esperar al envío completo.
+  function validarArchivos(e: React.FormEvent<HTMLFormElement>) {
     const input = formRef.current?.elements.namedItem(
-      "archivo"
+      "archivos"
     ) as HTMLInputElement | null;
-    const archivo = input?.files?.[0];
-    if (archivo && archivo.size > TAMANO_MAXIMO_BYTES) {
+    const archivos = input?.files;
+    if (!archivos || archivos.length === 0) return;
+
+    if (archivos.length > MAXIMO_ARCHIVOS) {
       e.preventDefault();
-      alert("El archivo supera el máximo de 10 MB.");
+      alert(`Puedes adjuntar hasta ${MAXIMO_ARCHIVOS} archivos.`);
+      return;
+    }
+
+    let total = 0;
+    for (const archivo of archivos) {
+      if (archivo.size > TAMANO_MAXIMO_BYTES) {
+        e.preventDefault();
+        alert(`"${archivo.name}" supera el máximo de 10 MB.`);
+        return;
+      }
+      total += archivo.size;
+    }
+    if (total > TAMANO_MAXIMO_TOTAL_BYTES) {
+      e.preventDefault();
+      alert("El total de archivos supera el máximo de 30 MB entre todos.");
     }
   }
 
@@ -54,27 +76,32 @@ export default function FormularioEntrega({
     <form
       ref={formRef}
       action={formAction}
-      onSubmit={validarArchivo}
+      onSubmit={validarArchivos}
       className="mt-3 flex flex-col gap-3 border-t border-verde-bosque/15 pt-3"
     >
       <label className="flex flex-col gap-1 text-sm text-ink/80">
-        Archivo
+        Archivo(s)
         <input
           type="file"
-          name="archivo"
+          name="archivos"
           required
-          accept=".pdf,.docx,.jpg,.jpeg,.png"
+          multiple
+          accept=".pdf,.docx,.jpg,.jpeg,.png,.heic,.heif"
           // Sin efecto en escritorio (el navegador lo ignora); en un
           // celular le sugiere al navegador abrir la cámara directo en vez
-          // de solo el selector de archivos — el estudiante sigue pudiendo
-          // elegir "Galería" desde ese mismo selector si prefiere una foto
-          // ya tomada. No cambia nada del resto del flujo: llega como el
-          // mismo File de siempre a entregarTarea.
+          // de solo el selector de archivos. Con `multiple`, cada toque a
+          // la cámara sigue dando una sola foto (así funciona la cámara
+          // nativa del navegador), pero el estudiante puede repetir el
+          // selector o elegir varias ya tomadas desde su galería en una
+          // sola vez — útil para varias hojas de un cuaderno en una misma
+          // entrega. No cambia nada del resto del flujo: cada archivo
+          // llega como un File normal a entregarTarea.
           capture="environment"
           className="text-sm text-ink/70 file:mr-3 file:rounded-full file:border-0 file:bg-verde-bosque/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-verde-bosque"
         />
         <span className="text-xs text-ink/70">
-          PDF, DOCX, JPG o PNG. Máximo 10 MB.
+          PDF, DOCX, JPG, PNG o HEIC. Hasta {MAXIMO_ARCHIVOS} archivos, 10 MB
+          cada uno (30 MB en total).
         </span>
       </label>
 

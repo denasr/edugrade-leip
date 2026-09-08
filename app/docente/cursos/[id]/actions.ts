@@ -79,6 +79,8 @@ const TIPOS_PERMITIDOS = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/jpeg",
   "image/png",
+  "image/heic",
+  "image/heif",
 ];
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
 
@@ -113,7 +115,7 @@ export async function crearActividad(
 
   if (archivoFile) {
     if (!TIPOS_PERMITIDOS.includes(archivoFile.type)) {
-      return { error: "Formato no permitido. Usa PDF, DOCX, JPG o PNG." };
+      return { error: "Formato no permitido. Usa PDF, DOCX, JPG, PNG o HEIC." };
     }
     if (archivoFile.size > TAMANO_MAXIMO_BYTES) {
       return { error: "El archivo supera el máximo de 10 MB." };
@@ -210,7 +212,7 @@ export async function editarActividad(
 
   if (archivoFile) {
     if (!TIPOS_PERMITIDOS.includes(archivoFile.type)) {
-      return { error: "Formato no permitido. Usa PDF, DOCX, JPG o PNG." };
+      return { error: "Formato no permitido. Usa PDF, DOCX, JPG, PNG o HEIC." };
     }
     if (archivoFile.size > TAMANO_MAXIMO_BYTES) {
       return { error: "El archivo supera el máximo de 10 MB." };

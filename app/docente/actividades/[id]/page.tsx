@@ -82,27 +82,27 @@ export default async function DetalleActividadDocente({
 
   const entregasConEnlace = await Promise.all(
     (entregas ?? []).map(async (entrega) => {
-      const archivo = entrega.archivos_entrega[0] ?? null;
-      let enlaceDescarga: string | null = null;
-
-      if (archivo) {
-        // No debe tronar toda la página si Storage falla (red, timeout):
-        // sin enlace de descarga es degradación aceptable, un 500 no.
-        try {
-          const { data, error } = await supabase.storage
-            .from("archivos-entrega")
-            .createSignedUrl(archivo.storage_path, 60 * 10);
-          if (error) console.error("Error al firmar URL de entrega:", error);
-          enlaceDescarga = data?.signedUrl ?? null;
-        } catch (err) {
-          console.error("Excepción al firmar URL de entrega:", err);
-        }
-      }
+      const archivosConEnlace = await Promise.all(
+        entrega.archivos_entrega.map(async (archivo) => {
+          let enlaceDescarga: string | null = null;
+          // No debe tronar toda la página si Storage falla (red, timeout):
+          // sin enlace de descarga es degradación aceptable, un 500 no.
+          try {
+            const { data, error } = await supabase.storage
+              .from("archivos-entrega")
+              .createSignedUrl(archivo.storage_path, 60 * 10);
+            if (error) console.error("Error al firmar URL de entrega:", error);
+            enlaceDescarga = data?.signedUrl ?? null;
+          } catch (err) {
+            console.error("Excepción al firmar URL de entrega:", err);
+          }
+          return { nombreArchivo: archivo.nombre_archivo, enlaceDescarga };
+        })
+      );
 
       return {
         ...entrega,
-        nombreArchivo: archivo?.nombre_archivo ?? null,
-        enlaceDescarga,
+        archivosConEnlace,
         nombreEstudiante: nombrePorId.get(entrega.estudiante_id) ?? "—",
       };
     })
@@ -159,14 +159,21 @@ export default async function DetalleActividadDocente({
                     </p>
                   )}
 
-                  {entrega.enlaceDescarga && (
-                    <a
-                      href={entrega.enlaceDescarga}
-                      className="mt-2 flex items-center gap-1.5 text-sm font-medium text-verde-bosque hover:underline"
-                    >
-                      <IconoArchivo nombreArchivo={entrega.nombreArchivo ?? ""} />
-                      Descargar {entrega.nombreArchivo}
-                    </a>
+                  {entrega.archivosConEnlace.length > 0 && (
+                    <div className="mt-2 flex flex-col gap-1">
+                      {entrega.archivosConEnlace.map((archivo, i) =>
+                        archivo.enlaceDescarga ? (
+                          <a
+                            key={i}
+                            href={archivo.enlaceDescarga}
+                            className="flex items-center gap-1.5 text-sm font-medium text-verde-bosque hover:underline"
+                          >
+                            <IconoArchivo nombreArchivo={archivo.nombreArchivo} />
+                            Descargar {archivo.nombreArchivo}
+                          </a>
+                        ) : null
+                      )}
+                    </div>
                   )}
 
                   <FormularioCalificacion

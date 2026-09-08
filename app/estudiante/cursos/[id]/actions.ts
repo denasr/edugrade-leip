@@ -13,8 +13,33 @@ const TIPOS_PERMITIDOS = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/jpeg",
   "image/png",
+  "image/heic",
+  "image/heif",
 ];
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
+const MAXIMO_ARCHIVOS = 10;
+const TAMANO_MAXIMO_TOTAL_BYTES = 30 * 1024 * 1024;
+
+// entregas nunca tuvo policy de delete para el propio estudiante (solo se
+// agregó para el docente, en la migración de eliminar-estudiante) — un
+// supabase.from("entregas").delete() con el cliente normal aquí fallaría
+// en silencio (0 filas afectadas, sin error) y dejaría la entrega huérfana
+// para siempre, bloqueando cualquier reintento futuro por la restricción
+// de una entrega por actividad. Confirmado en vivo: así se generaron 7
+// entregas reales sin archivos en producción, antes de este fix, cuando
+// una subida fallaba a medio camino.
+//
+// Se usa la secret key nada más para este borrado puntual — la entrega
+// que se borra es la que la propia función acaba de crear en esta misma
+// invocación, nunca una ajena; no es un acceso nuevo a datos de otro
+// usuario, es limpieza de un error a mitad de la propia operación.
+async function borrarEntregaDeLimpieza(entregaId: string) {
+  const admin = createAdminClient();
+  const { error } = await admin.from("entregas").delete().eq("id", entregaId);
+  if (error) {
+    console.error("No se pudo limpiar la entrega tras un error:", error);
+  }
+}
 
 export async function entregarTarea(
   actividadId: string,
@@ -40,17 +65,32 @@ export async function entregarTarea(
     }
 
     const comentario = String(formData.get("comentario") ?? "").trim();
-    const archivo = formData.get("archivo");
+    const archivos = formData
+      .getAll("archivos")
+      .filter((a): a is File => a instanceof File && a.size > 0);
 
-    if (!(archivo instanceof File) || archivo.size === 0) {
-      return { error: "Adjunta un archivo para entregar la tarea." };
+    if (archivos.length === 0) {
+      return { error: "Adjunta al menos un archivo para entregar la tarea." };
+    }
+    if (archivos.length > MAXIMO_ARCHIVOS) {
+      return { error: `Puedes adjuntar hasta ${MAXIMO_ARCHIVOS} archivos.` };
     }
 
-    if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
-      return { error: "Formato no permitido. Usa PDF, DOCX, JPG o PNG." };
+    for (const archivo of archivos) {
+      if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
+        return {
+          error: `"${archivo.name}" no es un formato permitido. Usa PDF, DOCX, JPG, PNG o HEIC.`,
+        };
+      }
+      if (archivo.size > TAMANO_MAXIMO_BYTES) {
+        return { error: `"${archivo.name}" supera el máximo de 10 MB.` };
+      }
     }
-    if (archivo.size > TAMANO_MAXIMO_BYTES) {
-      return { error: "El archivo supera el máximo de 10 MB." };
+    const tamanoTotal = archivos.reduce((suma, a) => suma + a.size, 0);
+    if (tamanoTotal > TAMANO_MAXIMO_TOTAL_BYTES) {
+      return {
+        error: "El total de archivos supera el máximo de 30 MB entre todos.",
+      };
     }
 
     const { data: entrega, error: errorInsert } = await supabase
@@ -75,31 +115,48 @@ export async function entregarTarea(
     }
 
     // entrega.id (uuid) como carpeta ya evita colisiones entre estudiantes;
-    // el nombre en sí necesita sanearse porque Supabase Storage rechaza
-    // ciertos caracteres (espacios, acentos, paréntesis) con "Invalid key".
-    const storagePath = `${entrega.id}/${nombreArchivoSeguro(archivo.name)}`;
-    const { error: errorSubida } = await supabase.storage
-      .from("archivos-entrega")
-      .upload(storagePath, archivo, { contentType: archivo.type });
+    // el índice al frente evita que dos fotos con el mismo nombre de origen
+    // (común en fotos de celular, ej. "IMG_1234.jpg" repetido) se pisen
+    // entre sí dentro de la misma entrega. El nombre en sí necesita
+    // sanearse porque Supabase Storage rechaza ciertos caracteres (espacios,
+    // acentos, paréntesis) con "Invalid key".
+    const subidas: { storagePath: string; archivo: File }[] = [];
+    for (const [indice, archivo] of archivos.entries()) {
+      const storagePath = `${entrega.id}/${indice}-${nombreArchivoSeguro(archivo.name)}`;
+      const { error: errorSubida } = await supabase.storage
+        .from("archivos-entrega")
+        .upload(storagePath, archivo, { contentType: archivo.type });
 
-    if (errorSubida) {
-      console.error("Error al subir archivo de entrega:", errorSubida);
-      await supabase.from("entregas").delete().eq("id", entrega.id);
-      return { error: "No se pudo subir el archivo. Intenta de nuevo." };
+      if (errorSubida) {
+        console.error("Error al subir archivo de entrega:", errorSubida);
+        // Todo o nada: se limpia lo que ya se alcanzó a subir en esta misma
+        // entrega antes de cortar, para no dejar archivos huérfanos sin
+        // ninguna fila que los apunte.
+        if (subidas.length > 0) {
+          await supabase.storage
+            .from("archivos-entrega")
+            .remove(subidas.map((s) => s.storagePath));
+        }
+        await borrarEntregaDeLimpieza(entrega.id);
+        return { error: "No se pudo subir el archivo. Intenta de nuevo." };
+      }
+      subidas.push({ storagePath, archivo });
     }
 
-    const { error: errorArchivo } = await supabase
-      .from("archivos_entrega")
-      .insert({
+    const { error: errorArchivo } = await supabase.from("archivos_entrega").insert(
+      subidas.map(({ storagePath, archivo }) => ({
         entrega_id: entrega.id,
         nombre_archivo: archivo.name,
         storage_path: storagePath,
         tamano_bytes: archivo.size,
-      });
+      }))
+    );
 
     if (errorArchivo) {
-      await supabase.storage.from("archivos-entrega").remove([storagePath]);
-      await supabase.from("entregas").delete().eq("id", entrega.id);
+      await supabase.storage
+        .from("archivos-entrega")
+        .remove(subidas.map((s) => s.storagePath));
+      await borrarEntregaDeLimpieza(entrega.id);
       return { error: errorArchivo.message };
     }
 
