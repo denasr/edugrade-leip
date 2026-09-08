@@ -176,109 +176,148 @@ export async function presentarExamen(
   _estadoPrevio: EstadoExamen,
   formData: FormData
 ): Promise<EstadoExamen> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Mismo motivo que entregarTarea: protege contra una excepción real (no
+  // un error esperado que Supabase regresa con calma, sino algo que
+  // revienta a medio camino — timeout, conexión reseteada), que sin esto
+  // se saltaba todo el manejo de abajo y tronaba la pantalla completa vía
+  // error.tsx. Es más delicado aquí que en una tarea: `entregas` tiene un
+  // unique(actividad_id, estudiante_id), así que si la excepción revienta
+  // después de crear la fila pero antes de guardar las respuestas, un
+  // reintento choca con "Ya presentaste este examen" sin que el
+  // estudiante haya contestado nada — sin salida visible.
+  let entregaId: string | null = null;
+  let respuestasGuardadas = false;
 
-  if (!user) {
-    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
-  }
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const respuestas: { pregunta_id: string; respuesta_seleccionada: string }[] =
-    [];
-  for (const [nombre, valor] of formData.entries()) {
-    if (nombre.startsWith("respuesta-") && typeof valor === "string" && valor) {
-      respuestas.push({
-        pregunta_id: nombre.slice("respuesta-".length),
-        respuesta_seleccionada: valor,
-      });
+    if (!user) {
+      return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
     }
-  }
 
-  if (respuestas.length === 0) {
-    return { error: "Responde al menos una pregunta." };
-  }
-
-  const { data: entrega, error: errorInsert } = await supabase
-    .from("entregas")
-    .insert({
-      actividad_id: actividadId,
-      estudiante_id: user.id,
-    })
-    .select("id")
-    .single();
-
-  if (errorInsert || !entrega) {
-    if (errorInsert?.code === "23505") {
-      return { error: "Ya presentaste este examen." };
+    const respuestas: { pregunta_id: string; respuesta_seleccionada: string }[] =
+      [];
+    for (const [nombre, valor] of formData.entries()) {
+      if (nombre.startsWith("respuesta-") && typeof valor === "string" && valor) {
+        respuestas.push({
+          pregunta_id: nombre.slice("respuesta-".length),
+          respuesta_seleccionada: valor,
+        });
+      }
     }
-    return {
-      error:
-        errorInsert?.message ??
-        "No se pudo registrar tu examen. Verifica que siga abierto.",
-    };
-  }
 
-  const { error: errorRespuestas } = await supabase
-    .from("respuestas_examen")
-    .insert(
-      respuestas.map((r) => ({
-        entrega_id: entrega.id,
-        pregunta_id: r.pregunta_id,
-        respuesta_seleccionada: r.respuesta_seleccionada,
-      }))
+    if (respuestas.length === 0) {
+      return { error: "Responde al menos una pregunta." };
+    }
+
+    const { data: entrega, error: errorInsert } = await supabase
+      .from("entregas")
+      .insert({
+        actividad_id: actividadId,
+        estudiante_id: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (errorInsert || !entrega) {
+      if (errorInsert?.code === "23505") {
+        return { error: "Ya presentaste este examen." };
+      }
+      return {
+        error:
+          errorInsert?.message ??
+          "No se pudo registrar tu examen. Verifica que siga abierto.",
+      };
+    }
+    entregaId = entrega.id;
+
+    const { error: errorRespuestas } = await supabase
+      .from("respuestas_examen")
+      .insert(
+        respuestas.map((r) => ({
+          entrega_id: entrega.id,
+          pregunta_id: r.pregunta_id,
+          respuesta_seleccionada: r.respuesta_seleccionada,
+        }))
+      );
+
+    if (errorRespuestas) {
+      // Igual que en entregarTarea: el cliente normal del estudiante no
+      // tiene (ni ha tenido nunca) permiso de delete sobre `entregas` —
+      // este .delete() se veía bien pero fallaba en silencio, dejando la
+      // entrega huérfana sin ninguna respuesta guardada y bloqueando
+      // cualquier reintento futuro (mismo bug que ya encontramos y
+      // corregimos en entregarTarea, aquí sin que nadie lo hubiera notado
+      // todavía). Se usa la secret key nada más para este borrado puntual.
+      await borrarEntregaDeLimpieza(entrega.id);
+      return { error: errorRespuestas.message };
+    }
+    respuestasGuardadas = true;
+
+    // Calificar: preguntas_examen (con `correcta`) solo es legible con la
+    // secret key. Este resultado nunca llega al navegador; solo la nota final.
+    const admin = createAdminClient();
+    const { data: preguntas, error: errorPreguntas } = await admin
+      .from("preguntas_examen")
+      .select("id, correcta, puntos")
+      .eq("actividad_id", actividadId);
+
+    if (errorPreguntas || !preguntas || preguntas.length === 0) {
+      return {
+        error:
+          "Tu examen se registró, pero no se pudo calificar automáticamente. Avísale a tu docente.",
+      };
+    }
+
+    const puntosTotales = preguntas.reduce(
+      (suma, p) => suma + Number(p.puntos),
+      0
     );
+    const respuestasPorPregunta = new Map(
+      respuestas.map((r) => [r.pregunta_id, r.respuesta_seleccionada])
+    );
+    const puntosObtenidos = preguntas.reduce((suma, p) => {
+      const respuesta = respuestasPorPregunta.get(p.id);
+      return respuesta === p.correcta ? suma + Number(p.puntos) : suma;
+    }, 0);
 
-  if (errorRespuestas) {
-    await supabase.from("entregas").delete().eq("id", entrega.id);
-    return { error: errorRespuestas.message };
-  }
+    const notaSobreDiez =
+      puntosTotales > 0 ? (puntosObtenidos / puntosTotales) * 10 : 0;
+    const calificacionFinal = Math.round(notaSobreDiez * 100) / 100;
 
-  // Calificar: preguntas_examen (con `correcta`) solo es legible con la
-  // secret key. Este resultado nunca llega al navegador; solo la nota final.
-  const admin = createAdminClient();
-  const { data: preguntas, error: errorPreguntas } = await admin
-    .from("preguntas_examen")
-    .select("id, correcta, puntos")
-    .eq("actividad_id", actividadId);
+    const { error: errorEvaluacion } = await admin.from("evaluaciones").insert({
+      entrega_id: entrega.id,
+      calificacion_final: calificacionFinal,
+      origen: "AUTO_EXAMEN",
+    });
 
-  if (errorPreguntas || !preguntas || preguntas.length === 0) {
+    if (errorEvaluacion) {
+      return {
+        error:
+          "Tu examen se registró, pero no se pudo calificar automáticamente. Avísale a tu docente.",
+      };
+    }
+
+    revalidatePath(`/estudiante/cursos/${cursoId}`);
+    return { error: null };
+  } catch (err) {
+    console.error("Excepción inesperada en presentarExamen:", err);
+    // Si la excepción reventó antes de guardar las respuestas, no queda
+    // nada del estudiante que valga la pena conservar — se limpia la
+    // entrega para que pueda reintentar en vez de chocar con "Ya
+    // presentaste este examen" sin haber contestado nada. Si ya alcanzó a
+    // guardar sus respuestas (la excepción reventó después, ej. al
+    // calificar), se deja intacta a propósito — es preferible un examen
+    // "registrado, pendiente de calificar a mano" a borrar respuestas
+    // reales ya contestadas.
+    if (entregaId && !respuestasGuardadas) {
+      await borrarEntregaDeLimpieza(entregaId);
+    }
     return {
-      error:
-        "Tu examen se registró, pero no se pudo calificar automáticamente. Avísale a tu docente.",
+      error: "No se pudo registrar tu examen. Intenta de nuevo en un momento.",
     };
   }
-
-  const puntosTotales = preguntas.reduce(
-    (suma, p) => suma + Number(p.puntos),
-    0
-  );
-  const respuestasPorPregunta = new Map(
-    respuestas.map((r) => [r.pregunta_id, r.respuesta_seleccionada])
-  );
-  const puntosObtenidos = preguntas.reduce((suma, p) => {
-    const respuesta = respuestasPorPregunta.get(p.id);
-    return respuesta === p.correcta ? suma + Number(p.puntos) : suma;
-  }, 0);
-
-  const notaSobreDiez =
-    puntosTotales > 0 ? (puntosObtenidos / puntosTotales) * 10 : 0;
-  const calificacionFinal = Math.round(notaSobreDiez * 100) / 100;
-
-  const { error: errorEvaluacion } = await admin.from("evaluaciones").insert({
-    entrega_id: entrega.id,
-    calificacion_final: calificacionFinal,
-    origen: "AUTO_EXAMEN",
-  });
-
-  if (errorEvaluacion) {
-    return {
-      error:
-        "Tu examen se registró, pero no se pudo calificar automáticamente. Avísale a tu docente.",
-    };
-  }
-
-  revalidatePath(`/estudiante/cursos/${cursoId}`);
-  return { error: null };
 }
