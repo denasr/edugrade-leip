@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "respaldar": "node scripts/respaldar-base-datos.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.73.0",

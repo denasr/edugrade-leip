@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# respaldos manuales de la base de datos (scripts/respaldar-base-datos.mjs)
+# — datos reales de estudiantes, nunca al historial de git
+/backups
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
