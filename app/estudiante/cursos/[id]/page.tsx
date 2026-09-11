@@ -68,6 +68,7 @@ export default async function DetalleCursoEstudiante({
   // evaluaciones.entrega_id es UNIQUE, así que Postgrest lo embebe como
   // objeto (o null), a diferencia de archivos_entrega que sí es un arreglo.
   type EntregaConDetalle = {
+    id: string;
     actividad_id: string;
     comentario_estudiante: string | null;
     archivos_entrega: { nombre_archivo: string }[];
@@ -90,9 +91,54 @@ export default async function DetalleCursoEstudiante({
     (entregas ?? []).map((entrega) => [entrega.actividad_id, entrega])
   );
 
+  // "Cuestionario": misma tarea (cuenta para porcentaje_tareas) pero con
+  // preguntas de opción múltiple autocalificadas en vez de un archivo — se
+  // distingue únicamente por tener filas en preguntas_examen. Esa tabla no
+  // tiene ninguna policy de RLS (ver CLAUDE.md), así que esta consulta debe
+  // ir con la secret key — la inscripción a este curso ya se verificó
+  // arriba, este solo lee el dato puntual de qué actividades tienen
+  // preguntas, nunca su contenido.
+  const admin = createAdminClient();
+  const { data: preguntasCuestionarios } =
+    actividadIds.length > 0
+      ? await admin
+          .from("preguntas_examen")
+          .select("actividad_id")
+          .in("actividad_id", actividadIds)
+      : { data: [] };
+  const idsCuestionarios = new Set(
+    (preguntasCuestionarios ?? []).map((p) => p.actividad_id)
+  );
+
+  type PreguntaEstudianteTarea = {
+    id: string;
+    enunciado: string;
+    opciones: string[];
+    puntos: number;
+  };
+
   const actividadesConEnlace = await Promise.all(
     (actividades ?? []).map(async (actividad) => {
-      const material = actividad.materiales_actividad[0] ?? null;
+      const esCuestionario = idsCuestionarios.has(actividad.id);
+      const entregaActual = entregasPorActividad.get(actividad.id) ?? null;
+      const estado = estadoActividad(actividad);
+
+      let preguntas: PreguntaEstudianteTarea[] = [];
+      if (esCuestionario && !entregaActual && estado === "ABIERTA") {
+        const { data } = await supabase
+          .from("preguntas_examen_estudiante")
+          .select("id, enunciado, opciones, puntos")
+          .eq("actividad_id", actividad.id)
+          .order("orden", { ascending: true });
+        preguntas = (data ?? []) as PreguntaEstudianteTarea[];
+      }
+
+      // Un cuestionario no tiene material de apoyo ni archivo que descargar
+      // — el material sí lo permite el esquema para una tarea de archivo,
+      // pero aquí no aplica.
+      const material = esCuestionario
+        ? null
+        : (actividad.materiales_actividad[0] ?? null);
       let enlaceDescarga: string | null = null;
 
       if (material) {
@@ -111,9 +157,11 @@ export default async function DetalleCursoEstudiante({
 
       return {
         ...actividad,
+        esCuestionario,
+        preguntas,
         nombreArchivo: material?.nombre_archivo ?? null,
         enlaceDescarga,
-        entrega: entregasPorActividad.get(actividad.id) ?? null,
+        entrega: entregaActual,
       };
     })
   );
@@ -197,7 +245,6 @@ export default async function DetalleCursoEstudiante({
     .toISOString()
     .slice(0, 10);
 
-  const admin = createAdminClient();
   const { data: sesionesDesdeInscripcion } = await admin
     .from("sesiones_asistencia")
     .select("id")

@@ -313,6 +313,7 @@ type PreguntaEntrada = {
 
 export async function crearExamen(
   cursoId: string,
+  tipo: "TAREA" | "EXAMEN",
   _estadoPrevio: EstadoActividad,
   formData: FormData
 ): Promise<EstadoActividad> {
@@ -391,7 +392,7 @@ export async function crearExamen(
     .insert({
       curso_id: cursoId,
       titulo,
-      tipo: "EXAMEN",
+      tipo,
       instrucciones: instrucciones || null,
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
@@ -401,7 +402,11 @@ export async function crearExamen(
 
   if (errorInsert || !actividad) {
     return {
-      error: errorInsert?.message ?? "No se pudo crear el examen.",
+      error:
+        errorInsert?.message ??
+        (tipo === "TAREA"
+          ? "No se pudo crear el cuestionario."
+          : "No se pudo crear el examen."),
     };
   }
 

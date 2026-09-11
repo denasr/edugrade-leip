@@ -47,13 +47,22 @@ function preguntasIniciales(examenExistente?: ExamenExistente): PreguntaForm[] {
 
 const estadoInicial: EstadoActividad = { error: null };
 
+// Reusado para dos cosas distintas: un examen de verdad (tipo="EXAMEN",
+// cuenta para porcentaje_examenes) y un "cuestionario" — misma mecánica de
+// preguntas y autocalificación, pero archivado como tarea (tipo="TAREA",
+// cuenta para porcentaje_tareas). editarExamen no necesita saber cuál es
+// (nunca toca actividades.tipo, ese valor no cambia después de creado),
+// así que solo crearExamen recibe el tipo — la edición funciona igual
+// para ambos sin tocar nada aquí.
 export default function FormularioCrearExamen({
   cursoId,
+  tipo = "EXAMEN",
   examenExistente,
   tieneRespuestas = false,
   onCancelar,
 }: {
   cursoId: string;
+  tipo?: "TAREA" | "EXAMEN";
   examenExistente?: ExamenExistente;
   tieneRespuestas?: boolean;
   onCancelar?: () => void;
@@ -65,6 +74,7 @@ export default function FormularioCrearExamen({
   );
   const formRef = useRef<HTMLFormElement>(null);
   const editando = Boolean(examenExistente);
+  const etiqueta = tipo === "TAREA" ? "cuestionario" : "examen";
 
   async function guardarConAviso(
     prevState: EstadoActividad,
@@ -72,17 +82,17 @@ export default function FormularioCrearExamen({
   ): Promise<EstadoActividad> {
     const resultado = examenExistente
       ? await editarExamen(cursoId, examenExistente.id, prevState, formData)
-      : await crearExamen(cursoId, prevState, formData);
+      : await crearExamen(cursoId, tipo, prevState, formData);
 
     if (!resultado.error) {
       formRef.current?.reset();
       if (editando) {
         onCancelar?.();
-        mostrar("Examen actualizado.");
+        mostrar(`${etiqueta === "cuestionario" ? "Cuestionario" : "Examen"} actualizado.`);
       } else {
         setPreguntas([preguntaVacia()]);
         setAbierto(false);
-        mostrar("Examen creado.");
+        mostrar(`${etiqueta === "cuestionario" ? "Cuestionario" : "Examen"} creado.`);
       }
     }
     return resultado;
@@ -142,7 +152,7 @@ export default function FormularioCrearExamen({
         onClick={() => setAbierto(true)}
         className="btn-secondary w-full max-w-sm"
       >
-        + Nuevo examen
+        + Nuevo {etiqueta}
       </button>
     );
   }
@@ -150,7 +160,7 @@ export default function FormularioCrearExamen({
   return (
     <form ref={formRef} action={formAction} className="card w-full max-w-sm p-6">
       <h2 className="font-title text-xl text-verde-bosque">
-        {editando ? "Editar examen" : "Nuevo examen"}
+        {editando ? `Editar ${etiqueta}` : `Nuevo ${etiqueta}`}
       </h2>
 
       <div className="mt-4 flex flex-col gap-4">
@@ -202,7 +212,7 @@ export default function FormularioCrearExamen({
 
         {editando && tieneRespuestas && (
           <p className="rounded-lg bg-terracota/10 p-3 text-sm text-terracota">
-            Este examen ya tiene respuestas de estudiantes. Si cambias las
+            Este {etiqueta} ya tiene respuestas de estudiantes. Si cambias las
             preguntas, quienes ya presentaron verán una versión distinta a la
             que contestaron.
           </p>
@@ -309,7 +319,7 @@ export default function FormularioCrearExamen({
               ? "Guardando…"
               : editando
                 ? "Guardar cambios"
-                : "Crear examen"}
+                : `Crear ${etiqueta}`}
           </button>
           <button type="button" onClick={cancelar} className="link-muted">
             Cancelar

@@ -28,11 +28,16 @@ export default function TarjetaExamen({
   cursoId,
   stats,
   preguntas,
+  tipo = "EXAMEN",
 }: {
   examen: Examen;
   cursoId: string;
   stats: { presentados: number; sumaCalif: number; conCalif: number };
   preguntas: Pregunta[];
+  // Reusada tal cual para los "cuestionarios" (tipo="TAREA") que se crean
+  // desde la pestaña Tareas — misma tarjeta, mismas stats, solo cambia el
+  // texto que ve el docente al editar (ver formulario-crear-examen.tsx).
+  tipo?: "TAREA" | "EXAMEN";
 }) {
   const estado = estadoActividad(examen);
   const [editando, setEditando] = useState(false);
@@ -46,6 +51,7 @@ export default function TarjetaExamen({
       <li>
         <FormularioCrearExamen
           cursoId={cursoId}
+          tipo={tipo}
           examenExistente={{
             id: examen.id,
             titulo: examen.titulo,

@@ -5,11 +5,20 @@ import { ChevronDown } from "lucide-react";
 import { estadoActividad, motivoCierre, textoRelativoCierre } from "@/lib/actividades";
 import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioEntrega from "./formulario-entrega";
+import TarjetaExamenEstudiante from "./tarjeta-examen-estudiante";
 
 type Entrega = {
+  id: string;
   comentario_estudiante: string | null;
   archivos_entrega: { nombre_archivo: string }[];
   evaluaciones: { calificacion_final: number; comentarios: string | null } | null;
+};
+
+type PreguntaCuestionario = {
+  id: string;
+  enunciado: string;
+  opciones: string[];
+  puntos: number;
 };
 
 type Actividad = {
@@ -22,6 +31,10 @@ type Actividad = {
   nombreArchivo: string | null;
   enlaceDescarga: string | null;
   entrega: Entrega | null;
+  // "Cuestionario": misma tarea, pero con preguntas autocalificadas en vez
+  // de un archivo — se detecta por traer preguntas, no por un campo aparte.
+  esCuestionario: boolean;
+  preguntas: PreguntaCuestionario[];
 };
 
 export default function TarjetaTareaEstudiante({
@@ -37,8 +50,36 @@ export default function TarjetaTareaEstudiante({
 
   // Colapsada por default solo si ya cerró — un clic la abre a la tarjeta
   // completa, así nunca se pierde acceso a la calificación/retroalimentación
-  // ya puesta (no hay otra pantalla donde volver a verla).
+  // ya puesta (no hay otra pantalla donde volver a verla). Se llama antes
+  // del return anticipado de abajo a propósito: los Hooks de React deben
+  // llamarse siempre en el mismo orden, sin importar qué rama se use
+  // después (aunque esta tarjeta sea un cuestionario y termine sin usar
+  // este estado en absoluto).
   const [abierta, setAbierta] = useState(estado !== "CERRADA");
+
+  // Un cuestionario usa exactamente la misma tarjeta que un examen (mismo
+  // carrusel de preguntas, misma autocalificación, mismo "Ver mis
+  // respuestas") — solo cambia en qué pestaña/categoría de ponderación
+  // vive la actividad, no cómo se presenta ni se muestra.
+  if (actividad.esCuestionario) {
+    return (
+      <TarjetaExamenEstudiante
+        examen={{
+          id: actividad.id,
+          titulo: actividad.titulo,
+          instrucciones: actividad.instrucciones,
+          fecha_apertura: actividad.fecha_apertura,
+          fecha_cierre: actividad.fecha_cierre,
+          bloqueado_manual: actividad.bloqueado_manual,
+          entrega: actividad.entrega
+            ? { id: actividad.entrega.id, evaluaciones: actividad.entrega.evaluaciones }
+            : null,
+          preguntas: actividad.preguntas,
+        }}
+        cursoId={cursoId}
+      />
+    );
+  }
 
   if (estado === "CERRADA" && !abierta) {
     return (
