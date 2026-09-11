@@ -132,6 +132,7 @@ export default async function DetalleCursoEstudiante({
   const examenIds = (examenes ?? []).map((e) => e.id);
 
   type EntregaExamenPropia = {
+    id: string;
     actividad_id: string;
     evaluaciones: {
       calificacion_final: number;
@@ -143,7 +144,7 @@ export default async function DetalleCursoEstudiante({
     examenIds.length > 0
       ? await supabase
           .from("entregas")
-          .select("actividad_id, evaluaciones(calificacion_final, comentarios)")
+          .select("id, actividad_id, evaluaciones(calificacion_final, comentarios)")
           .eq("estudiante_id", user.id)
           .in("actividad_id", examenIds)
       : { data: [] }

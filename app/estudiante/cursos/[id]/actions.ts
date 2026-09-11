@@ -321,3 +321,94 @@ export async function presentarExamen(
     };
   }
 }
+
+export type PreguntaRevisada = {
+  enunciado: string;
+  opciones: string[];
+  correcta: string;
+  seleccionada: string | null;
+  puntos: number;
+};
+
+export type EstadoRevisionExamen = {
+  error: string | null;
+  preguntas: PreguntaRevisada[] | null;
+};
+
+// preguntas_examen.correcta solo es legible con la secret key (sin ninguna
+// policy, mismo patrón que en presentarExamen) — aquí se usa nada más
+// después de confirmar con el cliente normal que la entrega es del
+// estudiante que pregunta y que ya está calificada; nunca se expone la
+// respuesta correcta de un examen todavía abierto ni de la entrega de otro
+// estudiante.
+export async function obtenerRevisionExamen(
+  entregaId: string
+): Promise<EstadoRevisionExamen> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { error: "Tu sesión expiró. Vuelve a iniciar sesión.", preguntas: null };
+    }
+
+    const { data: entrega } = await supabase
+      .from("entregas")
+      .select("id, actividad_id, evaluaciones(id)")
+      .eq("id", entregaId)
+      .eq("estudiante_id", user.id)
+      .maybeSingle();
+
+    if (!entrega) {
+      return { error: "No tienes acceso a este examen.", preguntas: null };
+    }
+    if (!entrega.evaluaciones) {
+      return { error: "Este examen todavía no tiene calificación.", preguntas: null };
+    }
+
+    // Las respuestas del estudiante sí tienen policy de lectura propia
+    // (respuestas_select con es_dueno_de_entrega) — no hace falta la
+    // secret key para esta parte.
+    const { data: respuestas } = await supabase
+      .from("respuestas_examen")
+      .select("pregunta_id, respuesta_seleccionada")
+      .eq("entrega_id", entregaId);
+
+    const respuestaPorPregunta = new Map(
+      (respuestas ?? []).map((r) => [r.pregunta_id, r.respuesta_seleccionada])
+    );
+
+    const admin = createAdminClient();
+    const { data: preguntas, error: errorPreguntas } = await admin
+      .from("preguntas_examen")
+      .select("id, enunciado, opciones, correcta, puntos")
+      .eq("actividad_id", entrega.actividad_id)
+      .order("orden", { ascending: true });
+
+    if (errorPreguntas || !preguntas) {
+      return {
+        error: "No se pudo cargar la revisión. Intenta de nuevo.",
+        preguntas: null,
+      };
+    }
+
+    return {
+      error: null,
+      preguntas: preguntas.map((p) => ({
+        enunciado: p.enunciado,
+        opciones: p.opciones,
+        correcta: p.correcta,
+        seleccionada: respuestaPorPregunta.get(p.id) ?? null,
+        puntos: p.puntos,
+      })),
+    };
+  } catch (err) {
+    console.error("Excepción inesperada en obtenerRevisionExamen:", err);
+    return {
+      error: "No se pudo cargar la revisión. Intenta de nuevo en un momento.",
+      preguntas: null,
+    };
+  }
+}
