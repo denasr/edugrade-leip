@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { estadoActividad, textoRelativoCierre } from "@/lib/actividades";
 import FormularioCrearExamen from "./formulario-crear-examen";
 import BotonEliminarActividad from "./boton-eliminar-actividad";
-import { alternarBloqueo, eliminarActividad } from "./actions";
+import { alternarBloqueo, alternarVisibilidad, eliminarActividad } from "./actions";
 
 type Examen = {
   id: string;
@@ -14,6 +14,7 @@ type Examen = {
   fecha_apertura: string | null;
   fecha_cierre: string;
   bloqueado_manual: boolean;
+  visible_estudiantes: boolean;
 };
 
 type Pregunta = {
@@ -75,6 +76,12 @@ export default function TarjetaExamen({
     examen.id,
     !examen.bloqueado_manual
   );
+  const alternarVisibilidadAction = alternarVisibilidad.bind(
+    null,
+    cursoId,
+    examen.id,
+    !examen.visible_estudiantes
+  );
   const eliminarActividadAction = eliminarActividad.bind(
     null,
     cursoId,
@@ -93,6 +100,9 @@ export default function TarjetaExamen({
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
             {examen.titulo}
           </span>
+          {!examen.visible_estudiantes && (
+            <span className="badge-oculta shrink-0">Oculta</span>
+          )}
           <ChevronDown
             aria-hidden="true"
             className="h-4 w-4 shrink-0 text-ink/50"
@@ -107,6 +117,9 @@ export default function TarjetaExamen({
       <div className="flex items-start justify-between gap-2">
         <p className="font-medium text-ink">{examen.titulo}</p>
         <div className="flex shrink-0 items-center gap-1.5">
+          {!examen.visible_estudiantes && (
+            <span className="badge-oculta">Oculta</span>
+          )}
           <span className={estado === "ABIERTA" ? "badge-abierta" : "badge-cerrada"}>
             {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
           </span>
@@ -149,6 +162,11 @@ export default function TarjetaExamen({
         >
           Editar
         </button>
+        <form action={alternarVisibilidadAction}>
+          <button type="submit" className="link-muted">
+            {examen.visible_estudiantes ? "Ocultar" : "Publicar"}
+          </button>
+        </form>
         <form action={alternarBloqueoAction}>
           <button type="submit" className="link-muted">
             {examen.bloqueado_manual ? "Desbloquear" : "Bloquear"}

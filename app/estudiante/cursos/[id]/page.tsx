@@ -52,18 +52,16 @@ export default async function DetalleCursoEstudiante({
 
   if (!curso) redirect("/estudiante");
 
-  const { data: actividades } = await supabase
+  const { data: actividadesCrudas } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, materiales_actividad(nombre_archivo, storage_path)"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, materiales_actividad(nombre_archivo, storage_path)"
     )
     .eq("curso_id", id)
     .eq("tipo", "TAREA")
     .order("created_at", { ascending: false });
 
-  actividades?.sort(compararPorCierre);
-
-  const actividadIds = (actividades ?? []).map((a) => a.id);
+  const actividadIds = (actividadesCrudas ?? []).map((a) => a.id);
 
   // evaluaciones.entrega_id es UNIQUE, así que Postgrest lo embebe como
   // objeto (o null), a diferencia de archivos_entrega que sí es un arreglo.
@@ -90,6 +88,16 @@ export default async function DetalleCursoEstudiante({
   const entregasPorActividad = new Map(
     (entregas ?? []).map((entrega) => [entrega.actividad_id, entrega])
   );
+
+  // "Oculta": el docente la creó pero todavía no la publica (ver migración
+  // 20260911120000). Se filtra aquí, en JS, y no con un .eq en la consulta
+  // de arriba, a propósito: si el estudiante ya tiene una entrega para una
+  // actividad que se ocultó después, debe seguir viéndola (su calificación
+  // ya obtenida no debe desaparecer solo porque el docente activó el
+  // interruptor, p. ej. para prepararle una revisión).
+  const actividades = (actividadesCrudas ?? [])
+    .filter((a) => a.visible_estudiantes || entregasPorActividad.has(a.id))
+    .sort(compararPorCierre);
 
   // "Cuestionario": misma tarea (cuenta para porcentaje_tareas) pero con
   // preguntas de opción múltiple autocalificadas en vez de un archivo — se
@@ -118,7 +126,7 @@ export default async function DetalleCursoEstudiante({
   };
 
   const actividadesConEnlace = await Promise.all(
-    (actividades ?? []).map(async (actividad) => {
+    actividades.map(async (actividad) => {
       const esCuestionario = idsCuestionarios.has(actividad.id);
       const entregaActual = entregasPorActividad.get(actividad.id) ?? null;
       const estado = estadoActividad(actividad);
@@ -166,18 +174,16 @@ export default async function DetalleCursoEstudiante({
     })
   );
 
-  const { data: examenes } = await supabase
+  const { data: examenesCrudos } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes"
     )
     .eq("curso_id", id)
     .eq("tipo", "EXAMEN")
     .order("created_at", { ascending: false });
 
-  examenes?.sort(compararPorCierre);
-
-  const examenIds = (examenes ?? []).map((e) => e.id);
+  const examenIds = (examenesCrudos ?? []).map((e) => e.id);
 
   type EntregaExamenPropia = {
     id: string;
@@ -202,6 +208,12 @@ export default async function DetalleCursoEstudiante({
     (entregasExamen ?? []).map((e) => [e.actividad_id, e])
   );
 
+  // Mismo motivo que con las tareas: oculto no debe hacer desaparecer un
+  // examen que el estudiante ya presentó.
+  const examenes = (examenesCrudos ?? [])
+    .filter((e) => e.visible_estudiantes || entregaExamenPorActividad.has(e.id))
+    .sort(compararPorCierre);
+
   type PreguntaEstudiante = {
     id: string;
     enunciado: string;
@@ -210,7 +222,7 @@ export default async function DetalleCursoEstudiante({
   };
 
   const examenesConPreguntas = await Promise.all(
-    (examenes ?? []).map(async (examen) => {
+    examenes.map(async (examen) => {
       const entrega = entregaExamenPorActividad.get(examen.id) ?? null;
       const estado = estadoActividad(examen);
       let preguntas: PreguntaEstudiante[] = [];

@@ -304,6 +304,28 @@ export async function alternarBloqueo(
   revalidarPestanasCurso(cursoId);
 }
 
+// Oculta/publica: a diferencia de bloqueado_manual (que bloquea entregas de
+// algo que el estudiante sigue viendo), esto controla si la actividad existe
+// o no para el estudiante — mismo patrón que alternarBloqueo, reforzado a
+// nivel de base de datos (ver migración 20260911120000) para que "oculta"
+// también bloquee lectura directa de preguntas/material, no solo el filtro
+// en esta página.
+export async function alternarVisibilidad(
+  cursoId: string,
+  actividadId: string,
+  nuevoValor: boolean,
+  _formData: FormData
+) {
+  const supabase = await createClient();
+
+  await supabase
+    .from("actividades")
+    .update({ visible_estudiantes: nuevoValor })
+    .eq("id", actividadId);
+
+  revalidarPestanasCurso(cursoId);
+}
+
 type PreguntaEntrada = {
   enunciado: string;
   opciones: string[];

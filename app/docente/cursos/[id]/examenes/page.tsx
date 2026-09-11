@@ -41,7 +41,9 @@ export default async function ExamenesCurso({
   const [{ data: examenes }, pendientesTareas] = await Promise.all([
     supabase
       .from("actividades")
-      .select("id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual")
+      .select(
+        "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes"
+      )
       .eq("curso_id", id)
       .eq("tipo", "EXAMEN")
       .order("created_at", { ascending: false }),

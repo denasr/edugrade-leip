@@ -7,7 +7,7 @@ import { estadoActividad, textoRelativoCierre } from "@/lib/actividades";
 import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioActividad from "./formulario-actividad";
 import BotonEliminarActividad from "./boton-eliminar-actividad";
-import { alternarBloqueo, eliminarActividad } from "./actions";
+import { alternarBloqueo, alternarVisibilidad, eliminarActividad } from "./actions";
 
 type Actividad = {
   id: string;
@@ -16,6 +16,7 @@ type Actividad = {
   fecha_apertura: string | null;
   fecha_cierre: string;
   bloqueado_manual: boolean;
+  visible_estudiantes: boolean;
   materiales_actividad: { nombre_archivo: string }[];
 };
 
@@ -62,6 +63,12 @@ export default function TarjetaTarea({
     actividad.id,
     !actividad.bloqueado_manual
   );
+  const alternarVisibilidadAction = alternarVisibilidad.bind(
+    null,
+    cursoId,
+    actividad.id,
+    !actividad.visible_estudiantes
+  );
   const eliminarActividadAction = eliminarActividad.bind(
     null,
     cursoId,
@@ -80,6 +87,9 @@ export default function TarjetaTarea({
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
             {actividad.titulo}
           </span>
+          {!actividad.visible_estudiantes && (
+            <span className="badge-oculta shrink-0">Oculta</span>
+          )}
           {conteo.pendientes > 0 && (
             <span className="badge-pendiente shrink-0">
               {conteo.pendientes} pendientes
@@ -104,6 +114,9 @@ export default function TarjetaTarea({
           {actividad.titulo}
         </Link>
         <div className="flex shrink-0 items-center gap-1.5">
+          {!actividad.visible_estudiantes && (
+            <span className="badge-oculta">Oculta</span>
+          )}
           <span className={estado === "ABIERTA" ? "badge-abierta" : "badge-cerrada"}>
             {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
           </span>
@@ -158,6 +171,11 @@ export default function TarjetaTarea({
         >
           Editar
         </button>
+        <form action={alternarVisibilidadAction}>
+          <button type="submit" className="link-muted">
+            {actividad.visible_estudiantes ? "Ocultar" : "Publicar"}
+          </button>
+        </form>
         <form action={alternarBloqueoAction}>
           <button type="submit" className="link-muted">
             {actividad.bloqueado_manual ? "Desbloquear" : "Bloquear"}

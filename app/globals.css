@@ -83,6 +83,10 @@ body {
     @apply inline-block shrink-0 rounded-full bg-calificado/10 px-2.5 py-0.5 text-xs font-medium text-calificado;
   }
 
+  .badge-oculta {
+    @apply inline-block shrink-0 rounded-full bg-terracota/10 px-2.5 py-0.5 text-xs font-medium text-terracota;
+  }
+
   .toast {
     @apply pointer-events-auto rounded-full bg-verde-bosque px-4 py-2 text-center text-sm font-medium text-crema shadow-lg shadow-verde-bosque/20;
   }

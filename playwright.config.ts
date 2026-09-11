@@ -38,6 +38,9 @@ export default defineConfig({
     command: `npx next dev --port ${PUERTO}`,
     url: `http://localhost:${PUERTO}`,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    // Igual de generoso que el timeout de arriba y por la misma razón: en
+    // este entorno el arranque en frío de next dev (Turbopack + filesystem
+    // lento) puede tardar más de los 120s por defecto.
+    timeout: 300_000,
   },
 });
