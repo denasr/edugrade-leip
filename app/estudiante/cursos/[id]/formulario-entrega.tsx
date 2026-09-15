@@ -87,16 +87,6 @@ export default function FormularioEntrega({
           required
           multiple
           accept=".pdf,.docx,.jpg,.jpeg,.png,.heic,.heif"
-          // Sin efecto en escritorio (el navegador lo ignora); en un
-          // celular le sugiere al navegador abrir la cámara directo en vez
-          // de solo el selector de archivos. Con `multiple`, cada toque a
-          // la cámara sigue dando una sola foto (así funciona la cámara
-          // nativa del navegador), pero el estudiante puede repetir el
-          // selector o elegir varias ya tomadas desde su galería en una
-          // sola vez — útil para varias hojas de un cuaderno en una misma
-          // entrega. No cambia nada del resto del flujo: cada archivo
-          // llega como un File normal a entregarTarea.
-          capture="environment"
           className="text-sm text-ink/70 file:mr-3 file:rounded-full file:border-0 file:bg-verde-bosque/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-verde-bosque"
         />
         <span className="text-xs text-ink/70">
