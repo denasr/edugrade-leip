@@ -94,4 +94,44 @@ test.describe("Entrega de tarea con archivo", () => {
     await expect(page.getByText("Calificación: 8.5/10")).toBeVisible();
     await expect(page.getByText("Buen trabajo.")).toBeVisible();
   });
+
+  test("el estudiante entrega un archivo de tamaño real (varios MB) sin que falle por límite de payload", async ({
+    page,
+  }) => {
+    // Regresión dirigida: esta app ya tuvo dos bugs reales de producción
+    // causados por archivos "de tamaño real" fallando por límites de
+    // payload que ningún test detectó, porque el resto de specs de este
+    // archivo usan fixtures de unos cientos de bytes. El buffer se genera
+    // en memoria (no un fixture en disco) para no meter un binario pesado
+    // al repo. Ver el comentario sobre el límite de plataforma de Vercel en
+    // actions.ts — este test corre contra `next dev` local, así que no
+    // reproduce ese límite específico, pero sí protege el flujo de subida
+    // directa a Storage (crearEntrega -> subida en el navegador ->
+    // confirmarArchivosEntrega) contra una regresión con un payload real.
+    await iniciarSesion(page, docente.email, docente.password);
+    await page.goto(`/docente/cursos/${cursoId}/tareas`);
+    await page.click("text=+ Nueva tarea");
+    await page.fill('input[name="titulo"]', "Tarea E2E archivo grande");
+    await page.fill('input[name="fecha_cierre"]', "2099-12-31T23:59");
+    await page.getByRole("button", { name: "Crear tarea" }).click();
+    await expect(
+      page.getByRole("link", { name: "Tarea E2E archivo grande" })
+    ).toBeVisible();
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+    await expect(page.getByText("Tarea E2E archivo grande")).toBeVisible();
+    await page.setInputFiles('input[name="archivos"]', {
+      name: "foto-grande.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.alloc(6 * 1024 * 1024, 1),
+    });
+    await page.getByRole("button", { name: "Entregar tarea" }).click();
+    // Timeout más generoso que el default (15s) a propósito: subir 6 MB al
+    // proyecto real de Supabase por internet (no hay uno local) puede tardar
+    // más que un archivo de prueba de unos bytes.
+    await expect(page.getByText("Entregaste: foto-grande.jpg")).toBeVisible({
+      timeout: 60_000,
+    });
+  });
 });

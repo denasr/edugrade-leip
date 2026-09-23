@@ -3,22 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 
 export type EstadoEntrega = { error: string | null };
 export type EstadoExamen = { error: string | null };
 
-const TIPOS_PERMITIDOS = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/jpeg",
-  "image/png",
-  "image/heic",
-  "image/heif",
-];
-const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
+// Vercel impone su propio límite de payload (~4.5 MB) a las Serverless
+// Functions, por delante y de forma independiente de cualquier
+// `bodySizeLimit` configurado en next.config.ts (ese solo controla el
+// límite de Next.js/Node dentro de la función, no el de la plataforma).
+// Por eso los archivos de una entrega ya no viajan en el FormData de una
+// Server Action: el navegador los sube directo a Supabase Storage (mismo
+// origen/credenciales que usaría el cliente normal, mismas policies de
+// RLS) y estas Server Actions solo reciben metadata (rutas, nombres,
+// tamaños) para escribir en la base de datos. Ver formulario-entrega.tsx.
 const MAXIMO_ARCHIVOS = 10;
-const TAMANO_MAXIMO_TOTAL_BYTES = 30 * 1024 * 1024;
 
 // entregas nunca tuvo policy de delete para el propio estudiante (solo se
 // agregó para el docente, en la migración de eliminar-estudiante) — un
@@ -41,19 +39,15 @@ async function borrarEntregaDeLimpieza(entregaId: string) {
   }
 }
 
-export async function entregarTarea(
+export type EstadoCrearEntrega = { error: string | null; entregaId: string | null };
+
+// Paso 1: registra la entrega sin archivos. El navegador sube los archivos
+// directo a Storage después de esto (ver formulario-entrega.tsx) y recién
+// entonces llama a confirmarArchivosEntrega.
+export async function crearEntrega(
   actividadId: string,
-  cursoId: string,
-  _estadoPrevio: EstadoEntrega,
-  formData: FormData
-): Promise<EstadoEntrega> {
-  // Todas las llamadas a Supabase de aquí abajo ya verifican su `error` de
-  // respuesta (caso esperado: clave duplicada, RLS, etc.), pero ninguna
-  // estaba protegida contra una excepción real (timeout, conexión
-  // reseteada entre la función serverless y Supabase) — eso se saltaba
-  // todos esos checks y tronaba toda la pantalla vía error.tsx. Con este
-  // try/catch, ese caso también regresa un {error} amigable y la
-  // estudiante se queda en la misma pantalla en vez de perderla.
+  comentario: string
+): Promise<EstadoCrearEntrega> {
   try {
     const supabase = await createClient();
     const {
@@ -61,36 +55,7 @@ export async function entregarTarea(
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
-    }
-
-    const comentario = String(formData.get("comentario") ?? "").trim();
-    const archivos = formData
-      .getAll("archivos")
-      .filter((a): a is File => a instanceof File && a.size > 0);
-
-    if (archivos.length === 0) {
-      return { error: "Adjunta al menos un archivo para entregar la tarea." };
-    }
-    if (archivos.length > MAXIMO_ARCHIVOS) {
-      return { error: `Puedes adjuntar hasta ${MAXIMO_ARCHIVOS} archivos.` };
-    }
-
-    for (const archivo of archivos) {
-      if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
-        return {
-          error: `"${archivo.name}" no es un formato permitido. Usa PDF, DOCX, JPG, PNG o HEIC.`,
-        };
-      }
-      if (archivo.size > TAMANO_MAXIMO_BYTES) {
-        return { error: `"${archivo.name}" supera el máximo de 10 MB.` };
-      }
-    }
-    const tamanoTotal = archivos.reduce((suma, a) => suma + a.size, 0);
-    if (tamanoTotal > TAMANO_MAXIMO_TOTAL_BYTES) {
-      return {
-        error: "El total de archivos supera el máximo de 30 MB entre todos.",
-      };
+      return { error: "Tu sesión expiró. Vuelve a iniciar sesión.", entregaId: null };
     }
 
     const { data: entrega, error: errorInsert } = await supabase
@@ -105,69 +70,112 @@ export async function entregarTarea(
 
     if (errorInsert || !entrega) {
       if (errorInsert?.code === "23505") {
-        return { error: "Ya entregaste esta tarea." };
+        return { error: "Ya entregaste esta tarea.", entregaId: null };
       }
       return {
         error:
           errorInsert?.message ??
           "No se pudo registrar la entrega. Verifica que la tarea siga abierta.",
+        entregaId: null,
       };
     }
 
-    // entrega.id (uuid) como carpeta ya evita colisiones entre estudiantes;
-    // el índice al frente evita que dos fotos con el mismo nombre de origen
-    // (común en fotos de celular, ej. "IMG_1234.jpg" repetido) se pisen
-    // entre sí dentro de la misma entrega. El nombre en sí necesita
-    // sanearse porque Supabase Storage rechaza ciertos caracteres (espacios,
-    // acentos, paréntesis) con "Invalid key".
-    const subidas: { storagePath: string; archivo: File }[] = [];
-    for (const [indice, archivo] of archivos.entries()) {
-      const storagePath = `${entrega.id}/${indice}-${nombreArchivoSeguro(archivo.name)}`;
-      const { error: errorSubida } = await supabase.storage
-        .from("archivos-entrega")
-        .upload(storagePath, archivo, { contentType: archivo.type });
+    return { error: null, entregaId: entrega.id };
+  } catch (err) {
+    console.error("Excepción inesperada en crearEntrega:", err);
+    return {
+      error: "No se pudo registrar la entrega. Intenta de nuevo en un momento.",
+      entregaId: null,
+    };
+  }
+}
 
-      if (errorSubida) {
-        console.error("Error al subir archivo de entrega:", errorSubida);
-        // Todo o nada: se limpia lo que ya se alcanzó a subir en esta misma
-        // entrega antes de cortar, para no dejar archivos huérfanos sin
-        // ninguna fila que los apunte.
-        if (subidas.length > 0) {
-          await supabase.storage
-            .from("archivos-entrega")
-            .remove(subidas.map((s) => s.storagePath));
-        }
-        await borrarEntregaDeLimpieza(entrega.id);
-        return { error: "No se pudo subir el archivo. Intenta de nuevo." };
-      }
-      subidas.push({ storagePath, archivo });
+export type ArchivoSubido = {
+  storagePath: string;
+  nombreArchivo: string;
+  tamanoBytes: number;
+};
+
+// Paso 2 (éxito): el navegador ya subió los archivos a Storage; aquí solo
+// se registran en la base de datos. Si esto falla, se deshace todo (Storage
+// + la fila de entregas) para no dejar una entrega a medias.
+export async function confirmarArchivosEntrega(
+  entregaId: string,
+  cursoId: string,
+  archivos: ArchivoSubido[]
+): Promise<EstadoEntrega> {
+  try {
+    if (archivos.length === 0) {
+      await cancelarEntrega(entregaId);
+      return { error: "Adjunta al menos un archivo para entregar la tarea." };
+    }
+    if (archivos.length > MAXIMO_ARCHIVOS) {
+      await cancelarEntrega(entregaId);
+      return { error: `Puedes adjuntar hasta ${MAXIMO_ARCHIVOS} archivos.` };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
     }
 
     const { error: errorArchivo } = await supabase.from("archivos_entrega").insert(
-      subidas.map(({ storagePath, archivo }) => ({
-        entrega_id: entrega.id,
-        nombre_archivo: archivo.name,
-        storage_path: storagePath,
-        tamano_bytes: archivo.size,
+      archivos.map((a) => ({
+        entrega_id: entregaId,
+        nombre_archivo: a.nombreArchivo,
+        storage_path: a.storagePath,
+        tamano_bytes: a.tamanoBytes,
       }))
     );
 
     if (errorArchivo) {
       await supabase.storage
         .from("archivos-entrega")
-        .remove(subidas.map((s) => s.storagePath));
-      await borrarEntregaDeLimpieza(entrega.id);
+        .remove(archivos.map((a) => a.storagePath));
+      await borrarEntregaDeLimpieza(entregaId);
       return { error: errorArchivo.message };
     }
 
     revalidatePath(`/estudiante/cursos/${cursoId}`);
     return { error: null };
   } catch (err) {
-    console.error("Excepción inesperada en entregarTarea:", err);
+    console.error("Excepción inesperada en confirmarArchivosEntrega:", err);
+    await cancelarEntrega(entregaId);
     return {
       error: "No se pudo entregar la tarea. Intenta de nuevo en un momento.",
     };
   }
+}
+
+// Paso 2 (fallo): si la subida a Storage falla a mitad de camino en el
+// navegador, o confirmarArchivosEntrega no logra guardar la metadata, hay
+// que deshacer la entrega — el estudiante nunca tuvo permiso de borrar su
+// propia fila en `entregas` (mismo motivo que borrarEntregaDeLimpieza), así
+// que también se usa la secret key aquí. Se listan y borran los archivos
+// que hayan alcanzado a subirse bajo esta entrega en vez de recibir la
+// lista del cliente, para cubrir también el caso en que la conexión se
+// cortó antes de que el navegador pudiera avisar cuáles subió.
+export async function cancelarEntrega(entregaId: string): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { data: archivos } = await supabase.storage
+      .from("archivos-entrega")
+      .list(entregaId);
+
+    if (archivos && archivos.length > 0) {
+      await supabase.storage
+        .from("archivos-entrega")
+        .remove(archivos.map((a) => `${entregaId}/${a.name}`));
+    }
+  } catch (err) {
+    console.error("No se pudieron limpiar los archivos de la entrega:", err);
+  }
+
+  await borrarEntregaDeLimpieza(entregaId);
 }
 
 export async function presentarExamen(
@@ -176,7 +184,7 @@ export async function presentarExamen(
   _estadoPrevio: EstadoExamen,
   formData: FormData
 ): Promise<EstadoExamen> {
-  // Mismo motivo que entregarTarea: protege contra una excepción real (no
+  // Mismo motivo que crearEntrega/confirmarArchivosEntrega: protege contra una excepción real (no
   // un error esperado que Supabase regresa con calma, sino algo que
   // revienta a medio camino — timeout, conexión reseteada), que sin esto
   // se saltaba todo el manejo de abajo y tronaba la pantalla completa vía
