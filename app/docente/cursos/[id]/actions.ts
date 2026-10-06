@@ -367,6 +367,10 @@ export async function crearExamen(
   const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
   const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
   const preguntasJson = String(formData.get("preguntas") ?? "");
+  // Solo el formulario de examen (no el de cuestionario/tarea) manda este
+  // campo — ver formulario-crear-examen.tsx. Si no viene, intentos_permitidos
+  // se queda en 1 (el default de la columna), igual que una tarea normal.
+  const intentosPermitidos = formData.get("dos_intentos") === "on" ? 2 : 1;
 
   if (!titulo || !fechaCierre) {
     return {
@@ -418,6 +422,7 @@ export async function crearExamen(
       instrucciones: instrucciones || null,
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
+      intentos_permitidos: intentosPermitidos,
     })
     .select("id")
     .single();
@@ -490,6 +495,9 @@ export async function editarExamen(
   const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
   const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
   const preguntasJson = String(formData.get("preguntas") ?? "");
+  // Mismo criterio que crearExamen: el formulario de cuestionario no manda
+  // este campo, así que editar un cuestionario siempre lo deja en 1.
+  const intentosPermitidos = formData.get("dos_intentos") === "on" ? 2 : 1;
 
   if (!titulo || !fechaCierre) {
     return {
@@ -539,6 +547,7 @@ export async function editarExamen(
       instrucciones: instrucciones || null,
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
+      intentos_permitidos: intentosPermitidos,
     })
     .eq("id", actividadId);
 

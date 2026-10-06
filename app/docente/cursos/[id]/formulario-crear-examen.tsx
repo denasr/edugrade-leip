@@ -31,6 +31,7 @@ type ExamenExistente = {
   fecha_apertura: string | null;
   fecha_cierre: string;
   preguntas: PreguntaExistente[];
+  intentosPermitidos?: number;
 };
 
 function preguntasIniciales(examenExistente?: ExamenExistente): PreguntaForm[] {
@@ -216,6 +217,18 @@ export default function FormularioCrearExamen({
             preguntas, quienes ya presentaron verán una versión distinta a la
             que contestaron.
           </p>
+        )}
+
+        {tipo === "EXAMEN" && (
+          <label className="flex items-center gap-2 text-sm text-ink/80">
+            <input
+              type="checkbox"
+              name="dos_intentos"
+              defaultChecked={(examenExistente?.intentosPermitidos ?? 1) > 1}
+              className="accent-verde-bosque"
+            />
+            Permitir 2 intentos (cuenta el más reciente)
+          </label>
         )}
 
         <div className="flex flex-col gap-3 border-t border-verde-bosque/15 pt-3">

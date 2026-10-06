@@ -96,6 +96,13 @@ export async function obtenerLibroCalificaciones(
     evaluaciones: { calificacion_final: number } | null;
   };
 
+  // Un examen con "2 intentos" puede tener más de una entrega por
+  // estudiante — ordenar ascendente por created_at y dejar que la clave
+  // repetida se sobreescriba al construir el Map de abajo (la última
+  // entrada gana) deja solo el intento más reciente por actividad+
+  // estudiante, igual que en la vista del propio estudiante
+  // (app/estudiante/cursos/[id]/page.tsx). Las tareas nunca tienen más de
+  // una entrega, así que esto no les cambia nada.
   const { data: entregas } = (
     actividadIds.length > 0
       ? await supabase
@@ -104,6 +111,7 @@ export async function obtenerLibroCalificaciones(
             "actividad_id, estudiante_id, evaluaciones(calificacion_final)"
           )
           .in("actividad_id", actividadIds)
+          .order("created_at", { ascending: true })
       : { data: [] }
   ) as { data: EntregaConEstudiante[] | null };
 

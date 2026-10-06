@@ -22,6 +22,13 @@ type Examen = {
   bloqueado_manual: boolean;
   entrega: Entrega | null;
   preguntas: Pregunta[];
+  // Default 1/0 para que tarjeta-tarea-estudiante.tsx pueda reusar esta
+  // misma tarjeta para un cuestionario sin tener que calcular nada — un
+  // cuestionario siempre es de un solo intento (ver migración de
+  // intentos_permitidos), así que con los defaults ya se comporta igual
+  // que antes de que existiera esta función.
+  intentosPermitidos?: number;
+  intentosUsados?: number;
 };
 
 export default function TarjetaExamenEstudiante({
@@ -33,6 +40,10 @@ export default function TarjetaExamenEstudiante({
 }) {
   const estado = estadoActividad(examen);
   const evaluacion = examen.entrega?.evaluaciones ?? null;
+  const intentosPermitidos = examen.intentosPermitidos ?? 1;
+  const intentosUsados = examen.intentosUsados ?? (examen.entrega ? 1 : 0);
+  const intentosRestantes = intentosPermitidos - intentosUsados;
+  const puedeIntentarDeNuevo = estado === "ABIERTA" && intentosRestantes > 0;
 
   // Un examen entregado siempre trae evaluación (se autocalifica al
   // momento), así que a diferencia de la tarea aquí no hay un estado
@@ -125,7 +136,7 @@ export default function TarjetaExamenEstudiante({
         {")"}
       </p>
 
-      {examen.entrega ? (
+      {examen.entrega && (
         <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
           {evaluacion ? (
             <>
@@ -141,6 +152,15 @@ export default function TarjetaExamenEstudiante({
                   {mostrarRevision ? "Ocultar respuestas" : "Ver mis respuestas"}
                 </button>
               </div>
+
+              {intentosPermitidos > 1 && (
+                <p className="mt-1 text-xs text-ink/70">
+                  Intento {intentosUsados} de {intentosPermitidos}
+                  {!puedeIntentarDeNuevo &&
+                    estado === "ABIERTA" &&
+                    " · ya usaste todos tus intentos"}
+                </p>
+              )}
 
               {mostrarRevision && (
                 <div className="mt-3 flex flex-col gap-3">
@@ -186,16 +206,25 @@ export default function TarjetaExamenEstudiante({
             <span className="badge-pendiente">Presentado, calificando…</span>
           )}
         </div>
-      ) : estado === "ABIERTA" ? (
+      )}
+
+      {puedeIntentarDeNuevo ? (
         <FormularioPresentarExamen
           actividadId={examen.id}
           cursoId={cursoId}
           preguntas={examen.preguntas}
+          etiquetaIntento={
+            intentosPermitidos > 1
+              ? `Intento ${intentosUsados + 1} de ${intentosPermitidos}`
+              : undefined
+          }
         />
       ) : (
-        <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/70">
-          No se puede presentar. {motivoCierre(examen)}
-        </p>
+        !examen.entrega && (
+          <p className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm text-ink/70">
+            No se puede presentar. {motivoCierre(examen)}
+          </p>
+        )
       )}
     </li>
   );

@@ -42,7 +42,7 @@ export default async function ExamenesCurso({
     supabase
       .from("actividades")
       .select(
-        "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes"
+        "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos"
       )
       .eq("curso_id", id)
       .eq("tipo", "EXAMEN")
@@ -58,23 +58,36 @@ export default async function ExamenesCurso({
   // objeto (o null), no como arreglo.
   type EntregaExamen = {
     actividad_id: string;
+    estudiante_id: string;
     evaluaciones: { calificacion_final: number } | null;
   };
 
+  // Con "2 intentos" puede haber más de una entrega por estudiante en el
+  // mismo examen — ordenar ascendente y quedarse con la última por
+  // (actividad, estudiante) al construir el Map (las claves repetidas se
+  // sobreescriben, la última entrada gana) deja solo el intento más
+  // reciente, mismo criterio que la calificación final usa en todas partes
+  // (ver lib/calificacion-final.ts). Sin esto, "presentados" y el promedio
+  // contarían cada intento como si fuera un estudiante distinto.
   const { data: entregasExamen } = (
     examenIds.length > 0
       ? await supabase
           .from("entregas")
-          .select("actividad_id, evaluaciones(calificacion_final)")
+          .select("actividad_id, estudiante_id, evaluaciones(calificacion_final)")
           .in("actividad_id", examenIds)
+          .order("created_at", { ascending: true })
       : { data: [] }
   ) as { data: EntregaExamen[] | null };
+
+  const entregaMasRecientePorEstudiante = new Map<string, EntregaExamen>(
+    (entregasExamen ?? []).map((e) => [`${e.actividad_id}:${e.estudiante_id}`, e])
+  );
 
   const statsPorExamen = new Map<
     string,
     { presentados: number; sumaCalif: number; conCalif: number }
   >();
-  for (const entrega of entregasExamen ?? []) {
+  for (const entrega of entregaMasRecientePorEstudiante.values()) {
     const actual = statsPorExamen.get(entrega.actividad_id) ?? {
       presentados: 0,
       sumaCalif: 0,

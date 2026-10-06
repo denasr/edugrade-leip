@@ -15,6 +15,11 @@ type Examen = {
   fecha_cierre: string;
   bloqueado_manual: boolean;
   visible_estudiantes: boolean;
+  // Opcional porque esta tarjeta también se reusa para un "cuestionario"
+  // (tipo="TAREA" en la pestaña Tareas), que no trae esta columna en su
+  // consulta — siempre es de un solo intento, sin UI para cambiarlo, así
+  // que el default de abajo ya refleja ese caso correctamente.
+  intentos_permitidos?: number;
 };
 
 type Pregunta = {
@@ -60,6 +65,7 @@ export default function TarjetaExamen({
             fecha_apertura: examen.fecha_apertura,
             fecha_cierre: examen.fecha_cierre,
             preguntas,
+            intentosPermitidos: examen.intentos_permitidos,
           }}
           tieneRespuestas={stats.presentados > 0}
           onCancelar={() => setEditando(false)}
@@ -119,6 +125,11 @@ export default function TarjetaExamen({
         <div className="flex shrink-0 items-center gap-1.5">
           {!examen.visible_estudiantes && (
             <span className="badge-oculta">Oculta</span>
+          )}
+          {(examen.intentos_permitidos ?? 1) > 1 && (
+            <span className="inline-block shrink-0 rounded-full bg-verde-bosque/8 px-2.5 py-0.5 text-xs font-medium text-verde-bosque">
+              2 intentos
+            </span>
           )}
           <span className={estado === "ABIERTA" ? "badge-abierta" : "badge-cerrada"}>
             {estado === "ABIERTA" ? "Abierta" : "Cerrada"}

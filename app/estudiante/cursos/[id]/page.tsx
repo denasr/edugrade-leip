@@ -177,7 +177,7 @@ export default async function DetalleCursoEstudiante({
   const { data: examenesCrudos } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos"
     )
     .eq("curso_id", id)
     .eq("tipo", "EXAMEN")
@@ -194,6 +194,12 @@ export default async function DetalleCursoEstudiante({
     } | null;
   };
 
+  // Con "2 intentos" puede haber más de una entrega propia por examen —
+  // ordenar ascendente por created_at y dejar que la clave repetida se
+  // sobreescriba al construir el Map de abajo (la última entrada gana) deja
+  // el intento más reciente, que es el que cuenta para la calificación
+  // (ver CLAUDE.md). intentosUsadosPorActividad sí necesita el conteo
+  // completo, por eso se calcula aparte a partir del arreglo crudo.
   const { data: entregasExamen } = (
     examenIds.length > 0
       ? await supabase
@@ -201,12 +207,21 @@ export default async function DetalleCursoEstudiante({
           .select("id, actividad_id, evaluaciones(calificacion_final, comentarios)")
           .eq("estudiante_id", user.id)
           .in("actividad_id", examenIds)
+          .order("created_at", { ascending: true })
       : { data: [] }
   ) as { data: EntregaExamenPropia[] | null };
 
   const entregaExamenPorActividad = new Map(
     (entregasExamen ?? []).map((e) => [e.actividad_id, e])
   );
+
+  const intentosUsadosPorActividad = new Map<string, number>();
+  for (const e of entregasExamen ?? []) {
+    intentosUsadosPorActividad.set(
+      e.actividad_id,
+      (intentosUsadosPorActividad.get(e.actividad_id) ?? 0) + 1
+    );
+  }
 
   // Mismo motivo que con las tareas: oculto no debe hacer desaparecer un
   // examen que el estudiante ya presentó.
@@ -224,10 +239,12 @@ export default async function DetalleCursoEstudiante({
   const examenesConPreguntas = await Promise.all(
     examenes.map(async (examen) => {
       const entrega = entregaExamenPorActividad.get(examen.id) ?? null;
+      const intentosUsados = intentosUsadosPorActividad.get(examen.id) ?? 0;
+      const intentosRestantes = examen.intentos_permitidos - intentosUsados;
       const estado = estadoActividad(examen);
       let preguntas: PreguntaEstudiante[] = [];
 
-      if (!entrega && estado === "ABIERTA") {
+      if (intentosRestantes > 0 && estado === "ABIERTA") {
         const { data } = await supabase
           .from("preguntas_examen_estudiante")
           .select("id, enunciado, opciones, puntos")
@@ -236,7 +253,13 @@ export default async function DetalleCursoEstudiante({
         preguntas = (data ?? []) as PreguntaEstudiante[];
       }
 
-      return { ...examen, entrega, preguntas };
+      return {
+        ...examen,
+        entrega,
+        preguntas,
+        intentosPermitidos: examen.intentos_permitidos,
+        intentosUsados,
+      };
     })
   );
 
@@ -244,8 +267,13 @@ export default async function DetalleCursoEstudiante({
     (entregas ?? []).map((e) => e.evaluaciones?.calificacion_final)
   );
 
+  // Dedupeado al intento más reciente por actividad (entregaExamenPorActividad
+  // ya lo hace, ver el comentario de esa consulta) — de lo contrario un
+  // examen con 2 intentos presentados contaría doble en el promedio.
   const promedioExamenes = promedioCalificaciones(
-    (entregasExamen ?? []).map((e) => e.evaluaciones?.calificacion_final)
+    Array.from(entregaExamenPorActividad.values()).map(
+      (e) => e.evaluaciones?.calificacion_final
+    )
   );
 
   // La lectura de asistencia va con la secret key: hoy no hay policy de

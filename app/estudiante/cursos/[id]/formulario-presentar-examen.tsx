@@ -22,10 +22,12 @@ export default function FormularioPresentarExamen({
   actividadId,
   cursoId,
   preguntas,
+  etiquetaIntento,
 }: {
   actividadId: string;
   cursoId: string;
   preguntas: Pregunta[];
+  etiquetaIntento?: string;
 }) {
   const { mostrar } = useToast();
   const [indice, setIndice] = useState(0);
@@ -113,6 +115,9 @@ export default function FormularioPresentarExamen({
       action={formAction}
       className="mt-3 flex flex-col gap-4 border-t border-verde-bosque/15 pt-3"
     >
+      {etiquetaIntento && (
+        <p className="text-xs font-medium text-verde-bosque">{etiquetaIntento}</p>
+      )}
       <div className="flex items-center justify-between text-xs text-ink/70">
         <span>
           Pregunta {indice + 1} de {preguntas.length}
