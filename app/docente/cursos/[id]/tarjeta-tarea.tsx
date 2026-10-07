@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { estadoActividad, textoRelativoCierre } from "@/lib/actividades";
 import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioActividad from "./formulario-actividad";
+import FormularioCopiarActividad from "./formulario-copiar-actividad";
 import BotonEliminarActividad from "./boton-eliminar-actividad";
 import { alternarBloqueo, alternarVisibilidad, eliminarActividad } from "./actions";
 
@@ -20,17 +21,24 @@ type Actividad = {
   materiales_actividad: { nombre_archivo: string }[];
 };
 
+type CursoOpcion = { id: string; nombre: string; grupo: string; periodo: string };
+
 export default function TarjetaTarea({
   actividad,
   cursoId,
   conteo,
+  otrosCursos,
 }: {
   actividad: Actividad;
   cursoId: string;
   conteo: { total: number; pendientes: number };
+  // Cursos propios del docente aparte de este — [] si solo tiene uno. Sin
+  // esto no habría a dónde copiar, así que el botón "Copiar" ni se muestra.
+  otrosCursos: CursoOpcion[];
 }) {
   const estado = estadoActividad(actividad);
   const [editando, setEditando] = useState(false);
+  const [copiando, setCopiando] = useState(false);
   // Colapsada por default solo si ya está cerrada — ahorra espacio en
   // cursos con muchas tareas viejas sin esconder nada: un clic la abre a
   // la tarjeta completa de siempre, con Editar/Bloquear/Eliminar incluidos
@@ -52,6 +60,20 @@ export default function TarjetaTarea({
             material: actividad.materiales_actividad[0] ?? null,
           }}
           onCancelar={() => setEditando(false)}
+        />
+      </li>
+    );
+  }
+
+  if (copiando) {
+    return (
+      <li>
+        <FormularioCopiarActividad
+          actividadId={actividad.id}
+          cursoOrigenId={cursoId}
+          otrosCursos={otrosCursos}
+          etiqueta="tarea"
+          onCancelar={() => setCopiando(false)}
         />
       </li>
     );
@@ -171,6 +193,15 @@ export default function TarjetaTarea({
         >
           Editar
         </button>
+        {otrosCursos.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setCopiando(true)}
+            className="link-muted"
+          >
+            Copiar
+          </button>
+        )}
         <form action={alternarVisibilidadAction}>
           <button type="submit" className="link-muted">
             {actividad.visible_estudiantes ? "Ocultar" : "Publicar"}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { estadoActividad, textoRelativoCierre } from "@/lib/actividades";
 import FormularioCrearExamen from "./formulario-crear-examen";
+import FormularioCopiarActividad from "./formulario-copiar-actividad";
 import BotonEliminarActividad from "./boton-eliminar-actividad";
 import { alternarBloqueo, alternarVisibilidad, eliminarActividad } from "./actions";
 
@@ -29,12 +30,15 @@ type Pregunta = {
   puntos: number;
 };
 
+type CursoOpcion = { id: string; nombre: string; grupo: string; periodo: string };
+
 export default function TarjetaExamen({
   examen,
   cursoId,
   stats,
   preguntas,
   tipo = "EXAMEN",
+  otrosCursos = [],
 }: {
   examen: Examen;
   cursoId: string;
@@ -44,9 +48,13 @@ export default function TarjetaExamen({
   // desde la pestaña Tareas — misma tarjeta, mismas stats, solo cambia el
   // texto que ve el docente al editar (ver formulario-crear-examen.tsx).
   tipo?: "TAREA" | "EXAMEN";
+  // Cursos propios del docente aparte de este — [] si solo tiene uno. Sin
+  // esto no habría a dónde copiar, así que el botón "Copiar" ni se muestra.
+  otrosCursos?: CursoOpcion[];
 }) {
   const estado = estadoActividad(examen);
   const [editando, setEditando] = useState(false);
+  const [copiando, setCopiando] = useState(false);
   // Mismo patrón que TarjetaTarea: colapsada por default solo si ya cerró.
   // Sin badge de pendientes aquí — un examen se autocalifica al momento de
   // entregarse, no existe un estado "sin calificar" que señalar.
@@ -69,6 +77,20 @@ export default function TarjetaExamen({
           }}
           tieneRespuestas={stats.presentados > 0}
           onCancelar={() => setEditando(false)}
+        />
+      </li>
+    );
+  }
+
+  if (copiando) {
+    return (
+      <li>
+        <FormularioCopiarActividad
+          actividadId={examen.id}
+          cursoOrigenId={cursoId}
+          otrosCursos={otrosCursos}
+          etiqueta={tipo === "TAREA" ? "cuestionario" : "examen"}
+          onCancelar={() => setCopiando(false)}
         />
       </li>
     );
@@ -173,6 +195,15 @@ export default function TarjetaExamen({
         >
           Editar
         </button>
+        {otrosCursos.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setCopiando(true)}
+            className="link-muted"
+          >
+            Copiar
+          </button>
+        )}
         <form action={alternarVisibilidadAction}>
           <button type="submit" className="link-muted">
             {examen.visible_estudiantes ? "Ocultar" : "Publicar"}

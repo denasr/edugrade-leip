@@ -611,6 +611,162 @@ export async function editarExamen(
   return { error: null };
 }
 
+// Copia una tarea, cuestionario o examen a otro curso del mismo docente —
+// mismo título/instrucciones/preguntas/material, pero fechas nuevas
+// (obligatorias, nunca las de origen: casi siempre ya estarían vencidas) y
+// siempre oculta al crearse, para que el docente la revise/publique cuando
+// esté lista, igual que si la hubiera creado desde cero. Las entregas y
+// evaluaciones nunca se copian, por supuesto — son del estudiante, no de la
+// actividad.
+export async function copiarActividad(
+  actividadId: string,
+  cursoOrigenId: string,
+  _estadoPrevio: EstadoActividad,
+  formData: FormData
+): Promise<EstadoActividad> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  const cursoDestinoId = String(formData.get("curso_destino_id") ?? "").trim();
+  const fechaApertura = String(formData.get("fecha_apertura") ?? "").trim();
+  const fechaCierre = String(formData.get("fecha_cierre") ?? "").trim();
+
+  if (!cursoDestinoId || !fechaCierre) {
+    return { error: "Elige un curso destino y una fecha de cierre." };
+  }
+
+  // El <select> del formulario solo lista cursos propios, pero un request
+  // directo podría mandar cualquier id — se verifica aparte en vez de
+  // confiar en lo que llegó.
+  const { data: cursoDestino } = await supabase
+    .from("cursos")
+    .select("id")
+    .eq("id", cursoDestinoId)
+    .eq("docente_id", user.id)
+    .maybeSingle();
+
+  if (!cursoDestino) {
+    return { error: "No tienes permiso sobre el curso destino." };
+  }
+
+  // Verifica dueño de la actividad origen vía su propio curso, mismo patrón
+  // que editarExamen, y de paso trae lo necesario para duplicarla.
+  const { data: actividadOrigen } = (await supabase
+    .from("actividades")
+    .select(
+      "titulo, tipo, instrucciones, intentos_permitidos, cursos(docente_id)"
+    )
+    .eq("id", actividadId)
+    .single()) as {
+    data: {
+      titulo: string;
+      tipo: "TAREA" | "EXAMEN";
+      instrucciones: string | null;
+      intentos_permitidos: number;
+      cursos: { docente_id: string } | null;
+    } | null;
+  };
+
+  if (!actividadOrigen || actividadOrigen.cursos?.docente_id !== user.id) {
+    return { error: "No tienes permiso sobre esta actividad." };
+  }
+
+  const { data: nueva, error: errorInsert } = await supabase
+    .from("actividades")
+    .insert({
+      curso_id: cursoDestinoId,
+      titulo: actividadOrigen.titulo,
+      tipo: actividadOrigen.tipo,
+      instrucciones: actividadOrigen.instrucciones,
+      fecha_apertura: fechaApertura || null,
+      fecha_cierre: fechaCierre,
+      intentos_permitidos: actividadOrigen.intentos_permitidos,
+      visible_estudiantes: false,
+    })
+    .select("id")
+    .single();
+
+  if (errorInsert || !nueva) {
+    return {
+      error: errorInsert?.message ?? "No se pudo copiar la actividad.",
+    };
+  }
+
+  // preguntas_examen no tiene ninguna policy (ni para el dueño), mismo
+  // motivo que crearExamen/editarExamen: solo la secret key puede tocarla.
+  // Cubre tanto un examen como un cuestionario (TAREA con preguntas) — una
+  // actividad de archivo normal simplemente no trae ninguna fila aquí.
+  const admin = createAdminClient();
+  const { data: preguntas } = await admin
+    .from("preguntas_examen")
+    .select("enunciado, opciones, correcta, puntos, orden")
+    .eq("actividad_id", actividadId)
+    .order("orden", { ascending: true });
+
+  if (preguntas && preguntas.length > 0) {
+    const { error: errorPreguntas } = await admin.from("preguntas_examen").insert(
+      preguntas.map((p) => ({ ...p, actividad_id: nueva.id }))
+    );
+
+    if (errorPreguntas) {
+      await supabase.from("actividades").delete().eq("id", nueva.id);
+      return { error: errorPreguntas.message };
+    }
+  }
+
+  // Igual que arriba: solo una tarea de archivo trae material, nunca un
+  // cuestionario ni un examen — en la práctica es a lo más una fila.
+  const { data: materiales } = await supabase
+    .from("materiales_actividad")
+    .select("nombre_archivo, storage_path, tamano_bytes")
+    .eq("actividad_id", actividadId);
+
+  if (materiales && materiales.length > 0) {
+    const material = materiales[0];
+    // .copy() duplica el objeto dentro del propio Storage (nunca pasa por
+    // esta función como archivo), así que no importa su tamaño — no es el
+    // mismo riesgo de límite de payload que ya se corrigió en la entrega de
+    // un estudiante.
+    const storagePathNuevo = `${cursoDestinoId}/${nueva.id}/${nombreArchivoSeguro(material.nombre_archivo)}`;
+    const { error: errorCopia } = await supabase.storage
+      .from("materiales-actividades")
+      .copy(material.storage_path, storagePathNuevo);
+
+    if (errorCopia) {
+      console.error("Error al copiar material de actividad:", errorCopia);
+      await supabase.from("actividades").delete().eq("id", nueva.id);
+      return { error: "No se pudo copiar el material adjunto." };
+    }
+
+    const { error: errorMaterial } = await supabase
+      .from("materiales_actividad")
+      .insert({
+        actividad_id: nueva.id,
+        nombre_archivo: material.nombre_archivo,
+        storage_path: storagePathNuevo,
+        tamano_bytes: material.tamano_bytes,
+      });
+
+    if (errorMaterial) {
+      await supabase.storage
+        .from("materiales-actividades")
+        .remove([storagePathNuevo]);
+      await supabase.from("actividades").delete().eq("id", nueva.id);
+      return { error: errorMaterial.message };
+    }
+  }
+
+  revalidarPestanasCurso(cursoOrigenId);
+  revalidarPestanasCurso(cursoDestinoId);
+  return { error: null };
+}
+
 export async function eliminarActividad(
   cursoId: string,
   actividadId: string,

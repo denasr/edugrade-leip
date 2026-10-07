@@ -38,6 +38,15 @@ export default async function ExamenesCurso({
 
   if (!curso) redirect("/docente");
 
+  // Para el botón "Copiar a otro curso" de cada tarjeta — [] si el docente
+  // solo tiene este curso, y las tarjetas ya ocultan el botón en ese caso.
+  const { data: otrosCursos } = await supabase
+    .from("cursos")
+    .select("id, nombre, grupo, periodo")
+    .eq("docente_id", user.id)
+    .neq("id", id)
+    .order("nombre", { ascending: true });
+
   const [{ data: examenes }, pendientesTareas] = await Promise.all([
     supabase
       .from("actividades")
@@ -162,6 +171,7 @@ export default async function ExamenesCurso({
                     }
                   }
                   preguntas={preguntasPorExamen.get(examen.id) ?? []}
+                  otrosCursos={otrosCursos ?? []}
                 />
               ))}
             </ul>

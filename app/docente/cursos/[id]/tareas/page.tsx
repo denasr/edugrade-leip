@@ -39,6 +39,15 @@ export default async function TareasCurso({
 
   if (!curso) redirect("/docente");
 
+  // Para el botón "Copiar a otro curso" de cada tarjeta — [] si el docente
+  // solo tiene este curso, y las tarjetas ya ocultan el botón en ese caso.
+  const { data: otrosCursos } = await supabase
+    .from("cursos")
+    .select("id, nombre, grupo, periodo")
+    .eq("docente_id", user.id)
+    .neq("id", id)
+    .order("nombre", { ascending: true });
+
   const { data: actividades } = await supabase
     .from("actividades")
     .select(
@@ -194,6 +203,7 @@ export default async function TareasCurso({
                       }
                     }
                     preguntas={preguntasPorActividad.get(actividad.id) ?? []}
+                    otrosCursos={otrosCursos ?? []}
                   />
                 ) : (
                   <TarjetaTarea
@@ -206,6 +216,7 @@ export default async function TareasCurso({
                         pendientes: 0,
                       }
                     }
+                    otrosCursos={otrosCursos ?? []}
                   />
                 )
               )}
