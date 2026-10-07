@@ -103,6 +103,10 @@ export default function LoginPage() {
             />
           </label>
 
+          <Link href="/recuperar" className="link-muted self-start">
+            ¿Olvidaste tu contraseña?
+          </Link>
+
           {error && <p className="text-sm text-terracota">{error}</p>}
 
           <button
