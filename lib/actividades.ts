@@ -93,16 +93,20 @@ export function fechaParaInput(fechaIso: string | null): string {
   )}:${pad(d.getMinutes())}`;
 }
 
-// Para resaltar una actividad en el panel del estudiante cuando falta menos
-// de un día para que cierre. Como función aparte (no un Date.now() inline
-// en el componente) porque las reglas de pureza de React no dejan llamar
-// una función impura directo en el cuerpo de un componente — igual que
-// estadoActividad/compararPorCierre de aquí mismo, que ya hacían lo mismo.
+// Para resaltar una actividad (en el panel del estudiante, o en su tarjeta
+// dentro de un curso) cuando falta menos de un día para que cierre — falso
+// si ya cerró, no solo si falta mucho: "cierra pronto" no debería ser
+// cierto para algo que ya pasó. Como función aparte (no un Date.now()
+// inline en el componente) porque las reglas de pureza de React no dejan
+// llamar una función impura directo en el cuerpo de un componente — igual
+// que estadoActividad/compararPorCierre de aquí mismo, que ya hacían lo
+// mismo.
 export function cierraPronto(
   fechaCierre: string,
   ahora: Date = new Date()
 ): boolean {
-  return new Date(fechaCierre).getTime() - ahora.getTime() < DIA;
+  const faltante = new Date(fechaCierre).getTime() - ahora.getTime();
+  return faltante > 0 && faltante < DIA;
 }
 
 // Comparador para ordenar actividades por cercanía a su fecha_cierre:

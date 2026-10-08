@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { estadoActividad, motivoCierre, textoRelativoCierre } from "@/lib/actividades";
+import {
+  estadoActividad,
+  motivoCierre,
+  textoRelativoCierre,
+  cierraPronto,
+} from "@/lib/actividades";
 import FormularioPresentarExamen from "./formulario-presentar-examen";
 import { obtenerRevisionExamen, type PreguntaRevisada } from "./actions";
 
@@ -126,7 +131,13 @@ export default function TarjetaExamenEstudiante({
         <p className="mt-1 text-sm text-ink/70">{examen.instrucciones}</p>
       )}
 
-      <p className="mt-2 text-xs text-ink/70">
+      <p
+        className={`mt-2 text-xs ${
+          estado === "ABIERTA" && cierraPronto(examen.fecha_cierre)
+            ? "font-medium text-terracota"
+            : "text-ink/70"
+        }`}
+      >
         {examen.fecha_apertura
           ? `Abre ${new Date(examen.fecha_apertura).toLocaleString("es-MX")} · `
           : ""}

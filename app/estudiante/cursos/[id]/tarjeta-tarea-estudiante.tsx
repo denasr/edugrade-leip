@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { estadoActividad, motivoCierre, textoRelativoCierre } from "@/lib/actividades";
+import {
+  estadoActividad,
+  motivoCierre,
+  textoRelativoCierre,
+  cierraPronto,
+} from "@/lib/actividades";
 import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioEntrega from "./formulario-entrega";
 import TarjetaExamenEstudiante from "./tarjeta-examen-estudiante";
@@ -133,7 +138,13 @@ export default function TarjetaTareaEstudiante({
         </p>
       )}
 
-      <p className="mt-2 text-xs text-ink/70">
+      <p
+        className={`mt-2 text-xs ${
+          estado === "ABIERTA" && cierraPronto(actividad.fecha_cierre)
+            ? "font-medium text-terracota"
+            : "text-ink/70"
+        }`}
+      >
         {actividad.fecha_apertura
           ? `Abre ${new Date(actividad.fecha_apertura).toLocaleString("es-MX")} · `
           : ""}
