@@ -2,9 +2,15 @@ import type { createClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-// Usado por las 5 pantallas de pestañas para el número que se muestra en el
-// badge de "Tareas" en la franja — se necesita en las 5, no solo en la de
-// Tareas, porque la franja (con su badge) se renderiza en todas.
+// Vive fuera de app/docente/cursos/[id] (donde estaba antes) a propósito:
+// importarlo desde /docente/page.tsx, que está fuera de ese segmento
+// dinámico, hacía que Next.js devolviera 404 en /docente — confirmado en
+// vivo, sin ningún otro cambio de por medio. Un helper compartido entre
+// rutas no debería vivir dentro de una de ellas de cualquier forma.
+//
+// Usado por las 5 pantallas de pestañas de un curso para el número del
+// badge de "Tareas" en la franja, y por /docente/page.tsx para el resumen
+// de "Por calificar" across todos los cursos del docente.
 export async function contarPendientesTareas(
   supabase: SupabaseServerClient,
   cursoId: string

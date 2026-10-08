@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
-import { contarPendientesTareas } from "../datos-compartidos";
+import { contarPendientesTareas } from "@/lib/pendientes-docente";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
 import FormularioCrearExamen from "../formulario-crear-examen";

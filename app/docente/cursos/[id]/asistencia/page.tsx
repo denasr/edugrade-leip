@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { contarPendientesTareas } from "../datos-compartidos";
+import { contarPendientesTareas } from "@/lib/pendientes-docente";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
 import BotonTomarAsistencia from "../boton-tomar-asistencia";
