@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import {
   cancelarEntrega,
   confirmarArchivosEntrega,
@@ -10,14 +11,29 @@ import { createClient } from "@/lib/supabase/client";
 import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 import { useToast } from "../../../toast-provider";
 
-const TIPOS_PERMITIDOS = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/jpeg",
-  "image/png",
-  "image/heic",
-  "image/heif",
-];
+// Tipo de archivo por extensión, no por `archivo.type`: ese dato lo pone el
+// navegador según el sistema operativo y no es confiable — en Windows sin
+// Office un .docx llega con type "", algunos Android reportan "image/jpg"
+// (no estándar) o "application/octet-stream" para archivos descargados de
+// WhatsApp/Drive. Validar contra `archivo.type` rechazaba archivos válidos
+// con "no es un formato permitido", y además ese mismo valor se mandaba
+// como contentType a Storage, cuyo bucket también lo rechazaba
+// (allowed_mime_types). Aquí se deduce el tipo canónico de la extensión y
+// ese es el que se valida y se manda a Storage.
+const TIPO_POR_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  heic: "image/heic",
+  heif: "image/heif",
+};
+
+function tipoDeArchivo(archivo: File): string | null {
+  const extension = archivo.name.split(".").pop()?.toLowerCase() ?? "";
+  return TIPO_POR_EXTENSION[extension] ?? null;
+}
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
 const TAMANO_MAXIMO_TOTAL_BYTES = 30 * 1024 * 1024;
 const MAXIMO_ARCHIVOS = 10;
@@ -28,6 +44,23 @@ const MAXIMO_ARCHIVOS = 10;
 // bodySizeLimit configurado en Next.js — con eso, una sola foto de celular
 // ya podía fallar aunque estuviera muy por debajo del límite que esta
 // misma pantalla anuncia (10 MB). Ver el comentario en actions.ts.
+// Antes todo error de Storage se mostraba como "Revisa tu conexión", aunque
+// el motivo real fuera el tamaño o el formato — el estudiante reintentaba
+// lo mismo sin saber qué cambiar.
+function mensajeErrorSubida(mensaje: string, nombreArchivo: string): string {
+  const m = mensaje.toLowerCase();
+  if (m.includes("exceeded") || m.includes("too large") || m.includes("size")) {
+    return `"${nombreArchivo}" supera el máximo de 10 MB.`;
+  }
+  if (m.includes("mime") || m.includes("type")) {
+    return `"${nombreArchivo}" no es un formato permitido. Usa PDF, DOCX, JPG, PNG o HEIC.`;
+  }
+  if (m.includes("jwt") || m.includes("unauthorized") || m.includes("row-level")) {
+    return "Tu sesión expiró. Recarga la página, vuelve a iniciar sesión e intenta de nuevo.";
+  }
+  return "No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.";
+}
+
 export default function FormularioEntrega({
   actividadId,
   cursoId,
@@ -51,7 +84,7 @@ export default function FormularioEntrega({
 
     let total = 0;
     for (const archivo of archivos) {
-      if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
+      if (!tipoDeArchivo(archivo)) {
         return `"${archivo.name}" no es un formato permitido. Usa PDF, DOCX, JPG, PNG o HEIC.`;
       }
       if (archivo.size > TAMANO_MAXIMO_BYTES) {
@@ -118,17 +151,27 @@ export default function FormularioEntrega({
       const storagePath = `${entregaId}/${indice}-${nombreArchivoSeguro(archivo.name)}`;
       const { error: errorSubida } = await supabase.storage
         .from("archivos-entrega")
-        .upload(storagePath, archivo, { contentType: archivo.type });
+        .upload(storagePath, archivo, { contentType: tipoDeArchivo(archivo)! });
 
       if (errorSubida) {
         console.error("Error al subir archivo de entrega:", errorSubida);
+        // Sin esto una subida fallida no dejaba ningún rastro: ocurre en el
+        // navegador, y Sentry solo captura excepciones no manejadas.
+        Sentry.captureException(errorSubida, {
+          tags: { flujo: "entrega-tarea" },
+          extra: {
+            tipoNavegador: archivo.type,
+            tamanoBytes: archivo.size,
+            extension: archivo.name.split(".").pop()?.toLowerCase(),
+          },
+        });
         if (subidas.length > 0) {
           await supabase.storage
             .from("archivos-entrega")
             .remove(subidas.map((s) => s.storagePath));
         }
         await cancelarEntrega(entregaId);
-        setError("No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.");
+        setError(mensajeErrorSubida(errorSubida.message, archivo.name));
         setPending(false);
         setProgreso(null);
         return;

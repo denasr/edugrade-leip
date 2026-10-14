@@ -50,8 +50,18 @@ export default function TarjetaTareaEstudiante({
   cursoId: string;
 }) {
   const estado = estadoActividad(actividad);
-  const evaluacion = actividad.entrega?.evaluaciones ?? null;
-  const archivosEntregados = actividad.entrega?.archivos_entrega ?? [];
+  // Una entrega de tarea sin ningún archivo ni calificación es un intento
+  // que se quedó a medias (ver crearEntrega en actions.ts), no una entrega
+  // real: se trata como "sin entregar" para volver a mostrar el formulario
+  // en vez de "Entregaste 0 archivos". Los cuestionarios no aplican — nunca
+  // llevan archivo — y se resuelven en su propia rama más abajo.
+  const entregaReal =
+    actividad.entrega &&
+    (actividad.entrega.archivos_entrega.length > 0 || actividad.entrega.evaluaciones)
+      ? actividad.entrega
+      : null;
+  const evaluacion = entregaReal?.evaluaciones ?? null;
+  const archivosEntregados = entregaReal?.archivos_entrega ?? [];
 
   // Colapsada por default solo si ya cerró — un clic la abre a la tarjeta
   // completa, así nunca se pierde acceso a la calificación/retroalimentación
@@ -102,7 +112,7 @@ export default function TarjetaTareaEstudiante({
             <span className="badge-calificado shrink-0">
               {evaluacion.calificacion_final}/10
             </span>
-          ) : actividad.entrega ? (
+          ) : entregaReal ? (
             <span className="badge-pendiente shrink-0">Sin calificar</span>
           ) : null}
           <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-ink/50" />
@@ -164,7 +174,7 @@ export default function TarjetaTareaEstudiante({
         </a>
       )}
 
-      {actividad.entrega ? (
+      {entregaReal ? (
         <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
           {archivosEntregados.length === 1 ? (
             <p className="flex items-center gap-1.5 text-ink/70">
@@ -184,9 +194,9 @@ export default function TarjetaTareaEstudiante({
               </ul>
             </div>
           )}
-          {actividad.entrega.comentario_estudiante && (
+          {entregaReal.comentario_estudiante && (
             <p className="mt-1 text-ink/70">
-              Tu comentario: {actividad.entrega.comentario_estudiante}
+              Tu comentario: {entregaReal.comentario_estudiante}
             </p>
           )}
           {evaluacion ? (

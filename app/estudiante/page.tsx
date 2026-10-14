@@ -83,11 +83,23 @@ export default async function PanelEstudiante() {
     actividadIds.length > 0
       ? await supabase
           .from("entregas")
-          .select("actividad_id")
+          .select("actividad_id, archivos_entrega(id), respuestas_examen(id), evaluaciones(id)")
           .eq("estudiante_id", user.id)
           .in("actividad_id", actividadIds)
       : { data: [] };
-  const idsConEntrega = new Set((entregasPropias ?? []).map((e) => e.actividad_id));
+  // Una entrega sin archivos, respuestas ni calificación es un intento de
+  // tarea que se quedó a medias (ver crearEntrega en
+  // app/estudiante/cursos/[id]/actions.ts) — sigue pendiente.
+  const idsConEntrega = new Set(
+    (entregasPropias ?? [])
+      .filter(
+        (e) =>
+          e.archivos_entrega.length > 0 ||
+          e.respuestas_examen.length > 0 ||
+          e.evaluaciones
+      )
+      .map((e) => e.actividad_id)
+  );
 
   const pendientes = (actividadesCrudas ?? [])
     .filter((a) => estadoActividad(a) === "ABIERTA" && !idsConEntrega.has(a.id))

@@ -134,4 +134,75 @@ test.describe("Entrega de tarea con archivo", () => {
       timeout: 60_000,
     });
   });
+
+  test("una entrega que se quedó a medias (sin archivos) no bloquea volver a entregar", async ({
+    page,
+  }) => {
+    // Regresión de producción: si la subida se interrumpía después de
+    // crearEntrega (pestaña cerrada, celular bloqueado, conexión cortada)
+    // y cancelarEntrega no alcanzaba a correr, la fila vacía de `entregas`
+    // dejaba la tarjeta en "Entregaste 0 archivos" sin formulario, y
+    // cualquier reintento chocaba con "Ya entregaste esta actividad". Aquí
+    // se fabrica esa fila directo con la secret key para reproducirlo.
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: actividad } = await admin
+      .from("actividades")
+      .insert({
+        curso_id: cursoId,
+        titulo: "Tarea E2E a medias",
+        tipo: "TAREA",
+        fecha_cierre: "2099-12-31T23:59:00Z",
+      })
+      .select("id")
+      .single();
+    await admin
+      .from("entregas")
+      .insert({ actividad_id: actividad!.id, estudiante_id: estudiante.id });
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante`);
+    await expect(page.getByText("Tarea E2E a medias")).toBeVisible();
+
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+    const tarjeta = page.locator("li", { hasText: "Tarea E2E a medias" });
+    await expect(tarjeta.getByText("Entregaste 0 archivos")).toHaveCount(0);
+    await tarjeta
+      .locator('input[name="archivos"]')
+      .setInputFiles(path.join(__dirname, "fixtures", "prueba.pdf"));
+    await tarjeta.getByRole("button", { name: "Entregar tarea" }).click();
+    await expect(tarjeta.getByText("Entregaste: prueba.pdf")).toBeVisible();
+  });
+
+  test("acepta un .docx aunque el navegador no reporte su tipo MIME", async ({
+    page,
+  }) => {
+    // En Windows sin Office (y en algunos Android) `File.type` de un .docx
+    // llega vacío; antes se rechazaba como "no es un formato permitido".
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    await admin.from("actividades").insert({
+      curso_id: cursoId,
+      titulo: "Tarea E2E docx sin tipo",
+      tipo: "TAREA",
+      fecha_cierre: "2099-12-31T23:59:00Z",
+    });
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+    const tarjeta = page.locator("li", { hasText: "Tarea E2E docx sin tipo" });
+    await tarjeta.locator('input[name="archivos"]').setInputFiles({
+      name: "Mi tarea (final).docx",
+      mimeType: "",
+      buffer: Buffer.from("PK contenido de prueba"),
+    });
+    await tarjeta.getByRole("button", { name: "Entregar tarea" }).click();
+    await expect(tarjeta.getByText("Entregaste: Mi tarea (final).docx")).toBeVisible();
+  });
 });

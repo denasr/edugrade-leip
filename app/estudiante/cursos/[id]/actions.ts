@@ -58,6 +58,47 @@ export async function crearEntrega(
       return { error: "Tu sesión expiró. Vuelve a iniciar sesión.", entregaId: null };
     }
 
+    // Si un intento anterior se quedó a medias (la fila de `entregas` se
+    // creó pero ningún archivo llegó a registrarse y cancelarEntrega no
+    // alcanzó a correr — p. ej. se cerró la pestaña, se bloqueó el celular
+    // o se cortó la conexión a mitad de la subida), esa fila vacía
+    // bloqueaba cualquier reintento con "Ya entregaste esta actividad". En
+    // vez de fallar, se reutiliza: es del propio estudiante, no tiene
+    // archivos ni calificación, así que no hay nada que perder.
+    const { data: previa } = await supabase
+      .from("entregas")
+      .select("id, archivos_entrega(id), evaluaciones(id)")
+      .eq("actividad_id", actividadId)
+      .eq("estudiante_id", user.id)
+      .maybeSingle();
+
+    if (previa && previa.archivos_entrega.length === 0 && !previa.evaluaciones) {
+      const { data: objetos } = await supabase.storage
+        .from("archivos-entrega")
+        .list(previa.id);
+      if (objetos && objetos.length > 0) {
+        await supabase.storage
+          .from("archivos-entrega")
+          .remove(objetos.map((o) => `${previa.id}/${o.name}`));
+      }
+
+      // entregas_update_propia exige que la actividad siga admitiendo
+      // entregas — si ya cerró, el update afecta 0 filas sin error.
+      const { data: actualizada } = await supabase
+        .from("entregas")
+        .update({ comentario_estudiante: comentario || null })
+        .eq("id", previa.id)
+        .select("id");
+
+      if (!actualizada || actualizada.length === 0) {
+        return {
+          error: "No se pudo registrar la entrega. Verifica que la tarea siga abierta.",
+          entregaId: null,
+        };
+      }
+      return { error: null, entregaId: previa.id };
+    }
+
     const { data: entrega, error: errorInsert } = await supabase
       .from("entregas")
       .insert({
