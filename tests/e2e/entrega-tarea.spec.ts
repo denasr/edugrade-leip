@@ -205,4 +205,73 @@ test.describe("Entrega de tarea con archivo", () => {
     await tarjeta.getByRole("button", { name: "Entregar tarea" }).click();
     await expect(tarjeta.getByText("Entregaste: Mi tarea (final).docx")).toBeVisible();
   });
+
+  test("el docente elimina una entrega con archivo equivocado (ya calificada) y el estudiante puede volver a entregar", async ({
+    page,
+  }) => {
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: actividad } = await admin
+      .from("actividades")
+      .insert({
+        curso_id: cursoId,
+        titulo: "Tarea E2E reenvio",
+        tipo: "TAREA",
+        fecha_cierre: "2099-12-31T23:59:00Z",
+      })
+      .select("id")
+      .single();
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+    await page.waitForLoadState("networkidle");
+    const tarjeta = page.locator("li", { hasText: "Tarea E2E reenvio" });
+    await tarjeta.locator('input[name="archivos"]').setInputFiles({
+      name: "equivocado.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 archivo equivocado"),
+    });
+    await tarjeta.getByRole("button", { name: "Entregar tarea" }).click();
+    await expect(tarjeta.getByText("Entregaste: equivocado.pdf")).toBeVisible();
+
+    const { data: archivoViejo } = await admin
+      .from("archivos_entrega")
+      .select("storage_path, entregas!inner(actividad_id)")
+      .eq("entregas.actividad_id", actividad!.id)
+      .single();
+
+    await iniciarSesion(page, docente.email, docente.password);
+    await page.goto(`/docente/actividades/${actividad!.id}`);
+    await page.fill('input[name="nota"]', "5");
+    await page.getByRole("button", { name: "Calificar" }).click();
+    await expect(page.getByText("Calificación guardada.")).toBeVisible();
+
+    let mensajeConfirmacion = "";
+    page.once("dialog", (dialogo) => {
+      mensajeConfirmacion = dialogo.message();
+      dialogo.accept();
+    });
+    await page.getByRole("button", { name: "Eliminar entrega" }).click();
+    await expect(page.getByText("Todavía no hay entregas para esta tarea.")).toBeVisible();
+    expect(mensajeConfirmacion, mensajeConfirmacion).toContain("calificación");
+
+    // El archivo real también se fue del bucket, no solo la fila.
+    const { data: objetos } = await admin.storage
+      .from("archivos-entrega")
+      .list(archivoViejo!.storage_path.split("/")[0]);
+    expect(objetos ?? []).toHaveLength(0);
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+    await page.waitForLoadState("networkidle");
+    await tarjeta.locator('input[name="archivos"]').setInputFiles(
+      path.join(__dirname, "fixtures", "prueba.pdf")
+    );
+    await tarjeta.getByRole("button", { name: "Entregar tarea" }).click();
+    await expect(tarjeta.getByText("Entregaste: prueba.pdf")).toBeVisible();
+    await expect(tarjeta.getByText("Pendiente de calificar")).toBeVisible();
+  });
 });

@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { IconoArchivo } from "@/lib/icono-archivo";
+import { estadoActividad } from "@/lib/actividades";
 import FormularioCalificacion from "./formulario-calificacion";
+import BotonEliminarEntrega from "./boton-eliminar-entrega";
 
 // select("cursos(...)") desde actividades es una relación many-to-one (FK en
 // actividades), así que Postgrest devuelve un objeto; el tipado por defecto
@@ -12,6 +14,9 @@ type ActividadConCurso = {
   id: string;
   titulo: string;
   curso_id: string;
+  fecha_apertura: string | null;
+  fecha_cierre: string;
+  bloqueado_manual: boolean;
   cursos: { id: string; nombre: string; docente_id: string } | null;
 };
 
@@ -38,7 +43,9 @@ export default async function DetalleActividadDocente({
 
   const { data: actividad } = (await supabase
     .from("actividades")
-    .select("id, titulo, curso_id, cursos(id, nombre, docente_id)")
+    .select(
+      "id, titulo, curso_id, fecha_apertura, fecha_cierre, bloqueado_manual, cursos(id, nombre, docente_id)"
+    )
     .eq("id", id)
     .single()) as { data: ActividadConCurso | null };
 
@@ -67,6 +74,8 @@ export default async function DetalleActividadDocente({
     .order("created_at", { ascending: true })) as {
     data: EntregaConDetalle[] | null;
   };
+
+  const actividadAbierta = estadoActividad(actividad) === "ABIERTA";
 
   const estudianteIds = [...new Set((entregas ?? []).map((e) => e.estudiante_id))];
   const { data: perfilesEstudiantes } =
@@ -181,6 +190,14 @@ export default async function DetalleActividadDocente({
                     entregaId={entrega.id}
                     notaActual={evaluacion?.calificacion_final ?? null}
                     comentarioActual={evaluacion?.comentarios ?? null}
+                  />
+
+                  <BotonEliminarEntrega
+                    actividadId={id}
+                    entregaId={entrega.id}
+                    nombreEstudiante={entrega.nombreEstudiante}
+                    calificada={evaluacion !== null}
+                    actividadAbierta={actividadAbierta}
                   />
                 </li>
               );
