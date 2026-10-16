@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
 import {
   crearCuenta,
   borrarCuenta,
@@ -84,5 +85,62 @@ test.describe("Examen autocalificado con revisión de respuestas", () => {
     await expect(tarjeta.getByText("4 ✓")).toBeVisible();
     await expect(tarjeta.getByText("Paris ✓")).toBeVisible();
     await expect(tarjeta.getByText("Madrid (tu respuesta)")).toBeVisible();
+  });
+
+  test("si las preguntas cambiaron después de presentar, la revisión avisa en vez de mostrar preguntas que no contestó", async ({
+    page,
+  }) => {
+    // Reproduce lo que deja en la base de datos editar las preguntas de un
+    // examen ya presentado: el `on delete cascade` de
+    // respuestas_examen.pregunta_id se lleva las respuestas, pero la
+    // entrega y su evaluación se conservan. Se arma directo con la secret
+    // key para no depender del formulario de edición.
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: examen } = await admin
+      .from("actividades")
+      .insert({
+        curso_id: cursoId,
+        titulo: "Examen E2E editado",
+        tipo: "EXAMEN",
+        fecha_cierre: "2099-12-31T23:59:00Z",
+      })
+      .select("id")
+      .single();
+    await admin.from("preguntas_examen").insert({
+      actividad_id: examen!.id,
+      enunciado: "Pregunta nueva tras editar",
+      opciones: ["A", "B", "C", "D"],
+      correcta: "A",
+      puntos: 5,
+      orden: 0,
+    });
+    const { data: entrega } = await admin
+      .from("entregas")
+      .insert({
+        actividad_id: examen!.id,
+        estudiante_id: estudiante.id,
+        estado: "CALIFICADO",
+      })
+      .select("id")
+      .single();
+    await admin.from("evaluaciones").insert({
+      entrega_id: entrega!.id,
+      calificacion_final: 7,
+      origen: "AUTO_EXAMEN",
+    });
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+    const tarjeta = page.locator("li", { hasText: "Examen E2E editado" });
+    await expect(tarjeta.getByText("Calificación: 7/10")).toBeVisible();
+    await tarjeta.getByText("Ver mis respuestas").click();
+    await expect(
+      tarjeta.getByText("Las preguntas de este examen cambiaron", { exact: false })
+    ).toBeVisible();
+    await expect(tarjeta.getByText("A ✓")).toHaveCount(0);
   });
 });

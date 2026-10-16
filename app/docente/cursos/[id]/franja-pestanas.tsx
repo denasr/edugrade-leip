@@ -38,7 +38,7 @@ export default function FranjaPestanas({
             className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap border-b-2 px-1 py-2.5 text-center text-xs font-medium transition-colors ${
               esActiva
                 ? "border-verde-bosque text-verde-bosque"
-                : "border-transparent text-ink/60 hover:text-ink/80"
+                : "border-transparent text-ink/70 hover:text-ink"
             }`}
           >
             {pestana.etiqueta}

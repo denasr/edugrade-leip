@@ -382,6 +382,8 @@ export type PreguntaRevisada = {
 export type EstadoRevisionExamen = {
   error: string | null;
   preguntas: PreguntaRevisada[] | null;
+  // Informativo, no un error (se muestra en tono neutro).
+  aviso?: string;
 };
 
 // preguntas_examen.correcta solo es legible con la secret key (sin ninguna
@@ -428,6 +430,20 @@ export async function obtenerRevisionExamen(
     const respuestaPorPregunta = new Map(
       (respuestas ?? []).map((r) => [r.pregunta_id, r.respuesta_seleccionada])
     );
+
+    // Si el docente editó las preguntas después de que el estudiante
+    // presentó, el `on delete cascade` de respuestas_examen.pregunta_id se
+    // llevó sus respuestas (la calificación sí se conserva). Mostrar la
+    // revisión así enseñaría las preguntas NUEVAS con la correcta marcada
+    // y sin la respuesta del estudiante — se avisa en su lugar.
+    if ((respuestas ?? []).length === 0) {
+      return {
+        error: null,
+        preguntas: null,
+        aviso:
+          "Las preguntas de este examen cambiaron después de que lo presentaste, así que ya no se puede mostrar la revisión. Tu calificación se conserva.",
+      };
+    }
 
     const admin = createAdminClient();
     const { data: preguntas, error: errorPreguntas } = await admin

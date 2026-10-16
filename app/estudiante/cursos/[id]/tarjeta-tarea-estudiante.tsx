@@ -115,7 +115,7 @@ export default function TarjetaTareaEstudiante({
           ) : entregaReal ? (
             <span className="badge-pendiente shrink-0">Sin calificar</span>
           ) : null}
-          <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-ink/50" />
+          <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-ink/70" />
         </button>
       </li>
     );
@@ -134,7 +134,7 @@ export default function TarjetaTareaEstudiante({
               type="button"
               onClick={() => setAbierta(false)}
               aria-label={`Colapsar ${actividad.titulo}`}
-              className="text-ink/50"
+              className="text-ink/70"
             >
               <ChevronDown aria-hidden="true" className="h-4 w-4 rotate-180" />
             </button>

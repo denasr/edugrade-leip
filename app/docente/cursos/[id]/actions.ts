@@ -767,27 +767,96 @@ export async function copiarActividad(
   return { error: null };
 }
 
+// Borra la actividad con todo lo que cuelga de ella. Las filas (entregas,
+// archivos_entrega, evaluaciones, respuestas, materiales, preguntas) se van
+// por `on delete cascade`, pero los objetos de Storage no dependen de
+// ninguna FK y hay que quitarlos aparte — antes solo se quitaba el material
+// y los archivos que entregaron los estudiantes se quedaban en el bucket sin
+// ninguna fila que los apuntara (ver "Reglas de negocio" en CLAUDE.md).
+//
+// Storage va antes que la fila: storage_entregas_delete_docente valida
+// es_docente_de_entrega(entrega_id), que necesita que la entrega siga viva —
+// borrando primero la actividad, el remove() "tendría éxito" con 0 objetos
+// borrados (mismo motivo que eliminarEntrega y eliminarEstudianteDeCurso).
 export async function eliminarActividad(
   cursoId: string,
   actividadId: string,
   _formData: FormData
-) {
-  const supabase = await createClient();
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const { data: materiales } = await supabase
-    .from("materiales_actividad")
-    .select("storage_path")
-    .eq("actividad_id", actividadId);
+    if (!user) {
+      return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+    }
 
-  if (materiales && materiales.length > 0) {
-    await supabase.storage
-      .from("materiales-actividades")
-      .remove(materiales.map((m) => m.storage_path));
+    const { data: actividad } = (await supabase
+      .from("actividades")
+      .select(
+        "id, cursos(docente_id), materiales_actividad(storage_path), entregas(archivos_entrega(storage_path))"
+      )
+      .eq("id", actividadId)
+      .eq("curso_id", cursoId)
+      .maybeSingle()) as {
+      data: {
+        id: string;
+        cursos: { docente_id: string } | null;
+        materiales_actividad: { storage_path: string }[];
+        entregas: { archivos_entrega: { storage_path: string }[] }[];
+      } | null;
+    };
+
+    if (!actividad || actividad.cursos?.docente_id !== user.id) {
+      return { error: "No tienes permiso sobre esta actividad." };
+    }
+
+    const rutasEntregas = actividad.entregas.flatMap((e) =>
+      e.archivos_entrega.map((a) => a.storage_path)
+    );
+    const rutasMateriales = actividad.materiales_actividad.map(
+      (m) => m.storage_path
+    );
+
+    if (rutasEntregas.length > 0) {
+      const { error } = await supabase.storage
+        .from("archivos-entrega")
+        .remove(rutasEntregas);
+      if (error) {
+        console.error("No se pudieron borrar los archivos de las entregas:", error);
+        return { error: "No se pudieron borrar los archivos de las entregas. Intenta de nuevo." };
+      }
+    }
+
+    if (rutasMateriales.length > 0) {
+      const { error } = await supabase.storage
+        .from("materiales-actividades")
+        .remove(rutasMateriales);
+      if (error) {
+        console.error("No se pudo borrar el material de apoyo:", error);
+        return { error: "No se pudo borrar el material de apoyo. Intenta de nuevo." };
+      }
+    }
+
+    const { data: borradas, error: errorDelete } = await supabase
+      .from("actividades")
+      .delete()
+      .eq("id", actividadId)
+      .select("id");
+
+    if (errorDelete || !borradas || borradas.length === 0) {
+      console.error("No se pudo eliminar la actividad:", errorDelete);
+      return { error: "No se pudo eliminar la actividad. Intenta de nuevo." };
+    }
+
+    revalidarPestanasCurso(cursoId);
+    return { error: null };
+  } catch (err) {
+    console.error("Excepción inesperada en eliminarActividad:", err);
+    return { error: "No se pudo eliminar la actividad. Intenta de nuevo en un momento." };
   }
-
-  await supabase.from("actividades").delete().eq("id", actividadId);
-
-  revalidarPestanasCurso(cursoId);
 }
 
 export async function eliminarEstudianteDeCurso(

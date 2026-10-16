@@ -133,7 +133,7 @@ export default function TarjetaExamen({
           )}
           <ChevronDown
             aria-hidden="true"
-            className="h-4 w-4 shrink-0 text-ink/50"
+            className="h-4 w-4 shrink-0 text-ink/70"
           />
         </button>
       </li>
@@ -161,7 +161,7 @@ export default function TarjetaExamen({
               type="button"
               onClick={() => setAbierto(false)}
               aria-label={`Colapsar ${examen.titulo}`}
-              className="text-ink/50"
+              className="text-ink/70"
             >
               <ChevronDown aria-hidden="true" className="h-4 w-4 rotate-180" />
             </button>

@@ -63,6 +63,7 @@ export default function TarjetaExamenEstudiante({
   const [revision, setRevision] = useState<PreguntaRevisada[] | null>(null);
   const [cargandoRevision, setCargandoRevision] = useState(false);
   const [errorRevision, setErrorRevision] = useState<string | null>(null);
+  const [avisoRevision, setAvisoRevision] = useState<string | null>(null);
 
   async function alternarRevision() {
     if (mostrarRevision) {
@@ -76,6 +77,10 @@ export default function TarjetaExamenEstudiante({
     setErrorRevision(null);
     const resultado = await obtenerRevisionExamen(examen.entrega.id);
     setCargandoRevision(false);
+    if (resultado.aviso) {
+      setAvisoRevision(resultado.aviso);
+      return;
+    }
     if (resultado.error || !resultado.preguntas) {
       setErrorRevision(resultado.error ?? "No se pudo cargar la revisión.");
       return;
@@ -100,7 +105,7 @@ export default function TarjetaExamenEstudiante({
               {evaluacion.calificacion_final}/10
             </span>
           )}
-          <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-ink/50" />
+          <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-ink/70" />
         </button>
       </li>
     );
@@ -119,7 +124,7 @@ export default function TarjetaExamenEstudiante({
               type="button"
               onClick={() => setAbierto(false)}
               aria-label={`Colapsar ${examen.titulo}`}
-              className="text-ink/50"
+              className="text-ink/70"
             >
               <ChevronDown aria-hidden="true" className="h-4 w-4 rotate-180" />
             </button>
@@ -181,6 +186,9 @@ export default function TarjetaExamenEstudiante({
                   {errorRevision && (
                     <p className="text-terracota">{errorRevision}</p>
                   )}
+                  {avisoRevision && (
+                    <p className="text-ink/70">{avisoRevision}</p>
+                  )}
                   {revision?.map((pregunta, i) => (
                     <div key={i}>
                       <p className="font-medium text-ink">
@@ -198,7 +206,7 @@ export default function TarjetaExamenEstudiante({
                                   ? "bg-calificado/10 font-medium text-calificado"
                                   : fueSeleccionada
                                     ? "bg-terracota/10 text-terracota"
-                                    : "text-ink/60"
+                                    : "text-ink/70"
                               }`}
                             >
                               {opcion}

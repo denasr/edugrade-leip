@@ -274,4 +274,54 @@ test.describe("Entrega de tarea con archivo", () => {
     await expect(tarjeta.getByText("Entregaste: prueba.pdf")).toBeVisible();
     await expect(tarjeta.getByText("Pendiente de calificar")).toBeVisible();
   });
+
+  test("eliminar una tarea borra del bucket los archivos que entregaron los estudiantes", async ({
+    page,
+  }) => {
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: actividad } = await admin
+      .from("actividades")
+      .insert({
+        curso_id: cursoId,
+        titulo: "Tarea E2E a eliminar",
+        tipo: "TAREA",
+        fecha_cierre: "2099-12-31T23:59:00Z",
+      })
+      .select("id")
+      .single();
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+    await page.waitForLoadState("networkidle");
+    const tarjeta = page.locator("li", { hasText: "Tarea E2E a eliminar" });
+    await tarjeta
+      .locator('input[name="archivos"]')
+      .setInputFiles(path.join(__dirname, "fixtures", "prueba.pdf"));
+    await tarjeta.getByRole("button", { name: "Entregar tarea" }).click();
+    await expect(tarjeta.getByText("Entregaste: prueba.pdf")).toBeVisible();
+
+    const { data: archivo } = await admin
+      .from("archivos_entrega")
+      .select("storage_path, entregas!inner(actividad_id)")
+      .eq("entregas.actividad_id", actividad!.id)
+      .single();
+    const carpeta = archivo!.storage_path.split("/")[0];
+
+    await iniciarSesion(page, docente.email, docente.password);
+    await page.goto(`/docente/cursos/${cursoId}/tareas`);
+    await page.waitForLoadState("networkidle");
+    const tarjetaDocente = page.locator("li", { hasText: "Tarea E2E a eliminar" });
+    page.once("dialog", (dialogo) => dialogo.accept());
+    await tarjetaDocente.getByRole("button", { name: "Eliminar" }).click();
+    await expect(page.getByText("Tarea E2E a eliminar")).toHaveCount(0);
+
+    // Antes solo se borraba el material de apoyo: este archivo se quedaba
+    // en el bucket sin ninguna fila que lo apuntara.
+    const { data: objetos } = await admin.storage.from("archivos-entrega").list(carpeta);
+    expect(objetos ?? []).toHaveLength(0);
+  });
 });
