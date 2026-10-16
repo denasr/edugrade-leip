@@ -66,7 +66,8 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   DOCX, JPG, PNG.
 - El examen de opción múltiple se autocalifica al momento de la entrega. Las tareas quedan
   en estado `PENDIENTE` hasta que el docente asigna calificación (0-10) y retroalimentación.
-- Un estudiante solo puede entregar una vez por actividad (edítese si se requiere reenvío).
+- Un estudiante solo puede entregar una vez por actividad. Para un reenvío, el docente
+  elimina la entrega (ver "Eliminar la entrega de un estudiante" abajo).
 
 ## Funcionalidad agregada durante el desarrollo (no venía del prototipo)
 - **Edición de tareas y exámenes.** El docente puede editar título, instrucciones, fechas,
@@ -150,6 +151,42 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `raise exception 'Ya estás inscrito en este curso'`, mismo mecanismo que ya usaba "Clave
   de acceso inválida". `clave_acceso` es única por curso y no expira ni rota — no hay
   ninguna lógica de vencimiento en el esquema.
+- **Entregas a medias no bloquean al estudiante.** Una tarea se entrega en tres pasos:
+  `crearEntrega` (fila en `entregas`), subida directa del navegador a Storage, y
+  `confirmarArchivosEntrega` (filas en `archivos_entrega`). Si la subida se interrumpe
+  (pestaña cerrada, celular bloqueado, conexión cortada) y `cancelarEntrega` no alcanza a
+  correr, queda una fila de `entregas` sin archivos. Una entrega de tarea **sin archivos ni
+  calificación** se trata como "sin entregar": la tarjeta del estudiante y "Pendientes"
+  vuelven a mostrarla, y `crearEntrega` reutiliza esa fila en vez de fallar con "Ya
+  entregaste esta actividad". Los cuestionarios no aplican (nunca llevan archivo; su
+  entrega cuenta por sus `respuestas_examen`).
+- **Tipo de archivo por extensión, no por `File.type`.** `formulario-entrega.tsx` valida
+  el formato y deduce el `contentType` que manda a Storage a partir de la extensión.
+  `File.type` llega vacío o no estándar en Windows sin Office (`.docx`) y en algunos
+  Android (`image/jpg`, `application/octet-stream`), y antes rechazaba archivos válidos.
+  Las subidas fallidas se reportan a Sentry (`flujo: entrega-tarea`): ocurren en el
+  navegador y no dejan ningún otro rastro.
+- **Recuperar contraseña.** `/recuperar` pide el enlace con un cliente aparte de flujo
+  `implicit`, no con el cliente PKCE de `@supabase/ssr`. Con PKCE el enlace solo se podía
+  canjear en el mismo navegador donde se pidió (el `code_verifier` vive en una cookie), y
+  fallaba al abrirlo en otro dispositivo o desde la app de Gmail. El enlace llega con la
+  sesión en el fragmento (`#access_token=...`) y lo lee `/restablecer-contrasena` del lado
+  del cliente. Los errores de envío (p. ej. límite de correos por hora) se muestran y van a
+  Sentry; "ese correo no tiene cuenta" nunca se revela. **Depende de la configuración de
+  Supabase Auth** (URL Configuration): Site URL `https://edugrade-leip.vercel.app` y
+  Redirect URLs `https://edugrade-leip.vercel.app/**` y `http://localhost:3210/**` (la de
+  las pruebas e2e). Si la URL de producción no está permitida, Supabase redirige a la Site
+  URL; hasta el 16-oct-2026 era `http://localhost:3000` y ningún enlace funcionaba.
+- **Eliminar la entrega de un estudiante.** Botón "Eliminar entrega" en
+  `/docente/actividades/[id]`, solo para el docente; el estudiante sigue sin policy de
+  delete sobre `entregas`, a propósito. Sirve para que el estudiante reenvíe tras subir un
+  archivo equivocado. Se permite aunque ya esté calificada (la calificación se borra con
+  ella), y el `confirm()` lo avisa, igual que avisa si la tarea ya cerró (entonces hay que
+  ampliar la fecha para que pueda reenviar). `eliminarEntrega` borra primero los objetos
+  de Storage y después la fila: `storage_entregas_delete_docente` necesita que la fila de
+  `entregas` siga existiendo para validar al docente. `archivos_entrega`, `evaluaciones` y
+  `respuestas_examen` se van por cascade. Usa las policies de delete del docente de la
+  migración `20260901120000`; no hizo falta migración nueva.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
