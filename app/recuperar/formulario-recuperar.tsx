@@ -2,7 +2,33 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import * as Sentry from "@sentry/nextjs";
+import { createClient } from "@supabase/supabase-js";
+
+// Cliente aparte, con flujo "implicit", solo para pedir el enlace. El
+// cliente normal del navegador (@supabase/ssr, ver lib/supabase/client.ts)
+// usa PKCE: el enlace del correo llega como ?code=... y canjearlo exige un
+// code_verifier que quedó guardado en una cookie del navegador donde se
+// pidió. Si el estudiante pedía el enlace en un dispositivo y lo abría en
+// otro — o desde la app de Gmail, que abre su propio navegador — el canje
+// fallaba y veía "El enlace venció o ya se usó". Con "implicit" el enlace
+// trae la sesión en el fragmento (#access_token=...), que funciona en
+// cualquier navegador y es justo el formato que ya lee
+// formulario-nueva-contrasena.tsx.
+function createClienteRecuperacion() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      auth: {
+        flowType: "implicit",
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
+}
 
 export default function FormularioRecuperar({
   enlaceInvalido,
@@ -12,22 +38,38 @@ export default function FormularioRecuperar({
   const [email, setEmail] = useState("");
   const [cargando, setCargando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setCargando(true);
 
-    const supabase = createClient();
-    // El error de resetPasswordForEmail nunca se le muestra al usuario: si
-    // se revelara "ese correo no existe" alguien podría usar este formulario
-    // para averiguar qué correos están registrados. Se muestra el mismo
-    // mensaje de éxito exista o no la cuenta, y se ignora el error de red
-    // aquí a propósito — cualquier problema real (SMTP mal configurado,
-    // etc.) solo lo puede diagnosticar el docente revisando los logs de
-    // Supabase, no algo que el formulario pueda explicarle al estudiante.
-    await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/confirm?next=/restablecer-contrasena`,
-    });
+    setError(null);
+    const supabase = createClienteRecuperacion();
+    // "Ese correo no existe" nunca se muestra (permitiría averiguar qué
+    // correos están registrados) — Supabase de todos modos responde éxito
+    // para un correo sin cuenta. Pero antes también se tragaba cualquier
+    // otro error y se mostraba "Revisa tu correo" aunque no se hubiera
+    // enviado nada: el límite de envíos por hora de Supabase dejaba al
+    // estudiante esperando un correo que nunca iba a llegar. Esos errores
+    // no revelan nada de la cuenta, así que sí se muestran.
+    const { error: errorEnvio } = await supabase.auth.resetPasswordForEmail(
+      email,
+      {
+        redirectTo: `${window.location.origin}/auth/confirm?next=/restablecer-contrasena`,
+      }
+    );
+
+    if (errorEnvio) {
+      Sentry.captureException(errorEnvio, { tags: { flujo: "recuperar-contrasena" } });
+      setCargando(false);
+      setError(
+        errorEnvio.status === 429
+          ? "Se pidieron demasiados enlaces en poco tiempo. Espera unos minutos e intenta de nuevo."
+          : "No se pudo enviar el enlace. Intenta de nuevo en un momento."
+      );
+      return;
+    }
 
     setCargando(false);
     setEnviado(true);
@@ -79,6 +121,8 @@ export default function FormularioRecuperar({
             className="input"
           />
         </label>
+
+        {error && <p className="text-sm text-terracota">{error}</p>}
 
         <button type="submit" disabled={cargando} className="btn-primary mt-2">
           {cargando ? "Enviando…" : "Enviar enlace"}
