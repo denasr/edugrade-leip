@@ -74,8 +74,8 @@ export default function ModalEliminarEstudiante({
             <p className="mt-3 text-sm text-ink/70">
               Esto borra de forma <strong>permanente</strong>: su inscripción
               a este curso, todas sus entregas de tareas, sus respuestas de
-              examen, sus calificaciones, y los archivos que haya subido en
-              este curso.
+              examen, sus calificaciones, su registro de asistencia y los
+              archivos que haya subido en este curso.
             </p>
             <p className="mt-2 text-sm text-ink/70">
               La cuenta del estudiante <strong>no</strong> se toca — solo su

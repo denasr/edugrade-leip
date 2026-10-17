@@ -954,6 +954,32 @@ export async function eliminarEstudianteDeCurso(
     };
   }
 
+  // Sus registros de asistencia en este curso. Ninguna de las dos fases los
+  // tocaba, y se quedaban sueltos (un registro de alguien ya no inscrito).
+  // Va después de la fase 2 a propósito y no es fatal: si fallara antes, el
+  // estudiante podría quedar inscrito sin su asistencia; si falla aquí, lo
+  // peor es un registro suelto que no afecta ningún cálculo (el % de
+  // asistencia se calcula solo desde la inscripción vigente). Usa la policy
+  // asistencias_delete_docente (migración 20260828120000), sin migración nueva.
+  const { data: sesiones } = await supabase
+    .from("sesiones_asistencia")
+    .select("id")
+    .eq("curso_id", cursoId);
+  const sesionIds = (sesiones ?? []).map((s) => s.id);
+  if (sesionIds.length > 0) {
+    const { error: errorAsistencia } = await supabase
+      .from("asistencias")
+      .delete()
+      .eq("estudiante_id", estudianteId)
+      .in("sesion_id", sesionIds);
+    if (errorAsistencia) {
+      console.error(
+        "No se pudieron borrar los registros de asistencia del estudiante eliminado:",
+        errorAsistencia
+      );
+    }
+  }
+
   revalidatePath("/docente");
   revalidarPestanasCurso(cursoId);
   return { error: null };
