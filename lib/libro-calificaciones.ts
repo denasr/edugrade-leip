@@ -1,5 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import { compararPorCierre } from "@/lib/actividades";
+import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
 import {
   calcularCalificacionFinal,
   calcularPorcentajeAsistencia,
@@ -103,17 +104,23 @@ export async function obtenerLibroCalificaciones(
   // estudiante, igual que en la vista del propio estudiante
   // (app/estudiante/cursos/[id]/page.tsx). Las tareas nunca tienen más de
   // una entrega, así que esto no les cambia nada.
-  const { data: entregas } = (
+  // Por páginas: crece con estudiantes × actividades (ver
+  // lib/leer-todas-las-filas.ts). `id` desempata created_at para que el
+  // orden sea único entre páginas.
+  const entregas =
     actividadIds.length > 0
-      ? await supabase
-          .from("entregas")
-          .select(
-            "actividad_id, estudiante_id, evaluaciones(calificacion_final)"
-          )
-          .in("actividad_id", actividadIds)
-          .order("created_at", { ascending: true })
-      : { data: [] }
-  ) as { data: EntregaConEstudiante[] | null };
+      ? await leerTodasLasFilas<EntregaConEstudiante>((desde, hasta) =>
+          supabase
+            .from("entregas")
+            .select(
+              "actividad_id, estudiante_id, evaluaciones(calificacion_final)"
+            )
+            .in("actividad_id", actividadIds)
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true })
+            .range(desde, hasta)
+        )
+      : [];
 
   const celdaPorActividadYEstudiante = new Map<string, CeldaActividad>(
     (entregas ?? []).map((e) => [
@@ -131,13 +138,23 @@ export async function obtenerLibroCalificaciones(
     .eq("curso_id", cursoId);
 
   const sesionIds = (sesiones ?? []).map((s) => s.id);
-  const { data: asistencias } =
+  // Por páginas: ~1 fila por estudiante por sesión, pasa de 1000 a mitad
+  // de semestre en un grupo grande (ver lib/leer-todas-las-filas.ts).
+  const asistencias =
     sesionIds.length > 0
-      ? await supabase
-          .from("asistencias")
-          .select("sesion_id, estudiante_id, estado")
-          .in("sesion_id", sesionIds)
-      : { data: [] };
+      ? await leerTodasLasFilas<{
+          sesion_id: string;
+          estudiante_id: string;
+          estado: string;
+        }>((desde, hasta) =>
+          supabase
+            .from("asistencias")
+            .select("sesion_id, estudiante_id, estado")
+            .in("sesion_id", sesionIds)
+            .order("id", { ascending: true })
+            .range(desde, hasta)
+        )
+      : [];
 
   const fechaPorSesion = new Map((sesiones ?? []).map((s) => [s.id, s.fecha]));
 

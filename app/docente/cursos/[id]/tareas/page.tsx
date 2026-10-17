@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
+import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
 import FormularioActividad from "../formulario-actividad";
@@ -85,14 +86,19 @@ export default async function TareasCurso({
     evaluaciones: { calificacion_final: number } | null;
   };
 
-  const { data: entregas } = (
+  // Por páginas: crece con estudiantes × tareas (ver
+  // lib/leer-todas-las-filas.ts).
+  const entregas =
     actividadIds.length > 0
-      ? await supabase
-          .from("entregas")
-          .select("actividad_id, estado, evaluaciones(calificacion_final)")
-          .in("actividad_id", actividadIds)
-      : { data: [] }
-  ) as { data: EntregaConEvaluacion[] | null };
+      ? await leerTodasLasFilas<EntregaConEvaluacion>((desde, hasta) =>
+          supabase
+            .from("entregas")
+            .select("actividad_id, estado, evaluaciones(calificacion_final)")
+            .in("actividad_id", actividadIds)
+            .order("id", { ascending: true })
+            .range(desde, hasta)
+        )
+      : [];
 
   const conteosPorActividad = new Map<
     string,

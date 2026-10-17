@@ -187,6 +187,22 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `entregas` siga existiendo para validar al docente. `archivos_entrega`, `evaluaciones` y
   `respuestas_examen` se van por cascade. Usa las policies de delete del docente de la
   migración `20260901120000`; no hizo falta migración nueva.
+- **Límite de 1000 filas por consulta.** Supabase (PostgREST) devuelve como máximo 1000
+  filas por consulta, sin error ni aviso. Toda consulta que lea algo de un curso completo
+  y crezca con el semestre (`asistencias` ≈ estudiantes × sesiones, `entregas` ≈
+  estudiantes × actividades) usa `leerTodasLasFilas` (`lib/leer-todas-las-filas.ts`), que
+  pide por páginas con `.range()` y un orden único (`.order("id")` como desempate). Se usa
+  en el libro de calificaciones (y por lo tanto en su exportación), la pestaña Asistencia y
+  las pestañas Tareas y Exámenes. Antes de este cambio, un grupo de 32 estudiantes habría
+  pasado de 1000 registros de asistencia hacia la sesión 31, y el % de asistencia y la nota
+  final del libro se habrían calculado con datos incompletos. Las consultas acotadas a un
+  solo estudiante o una sola sesión no lo necesitan.
+- **Eliminar a un estudiante también borra su asistencia.** `eliminarEstudianteDeCurso`
+  borra sus registros de `asistencias` del curso después de la fase 2 (no es fatal si
+  falla: solo dejaría registros sueltos que no afectan ningún cálculo). Usa la policy
+  `asistencias_delete_docente`; no hizo falta migración. Antes ninguna fase los tocaba: el
+  16-oct-2026 se borraron 24 registros sueltos de 5 estudiantes ya no inscritos (respaldo
+  local en `backups/2026-10-16-asistencias-sueltas/`, fuera de Git).
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,

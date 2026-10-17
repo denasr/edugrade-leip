@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { contarPendientesTareas } from "@/lib/pendientes-docente";
+import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
 import BotonTomarAsistencia from "../boton-tomar-asistencia";
@@ -47,13 +48,20 @@ export default async function AsistenciaCurso({
     .order("fecha", { ascending: false });
 
   const sesionIds = (sesionesAsistencia ?? []).map((s) => s.id);
-  const { data: asistenciasTodas } =
+  // Por páginas: ~1 fila por estudiante por sesión, pasa de 1000 a mitad
+  // de semestre en un grupo grande (ver lib/leer-todas-las-filas.ts).
+  const asistenciasTodas =
     sesionIds.length > 0
-      ? await supabase
-          .from("asistencias")
-          .select("sesion_id, estado")
-          .in("sesion_id", sesionIds)
-      : { data: [] };
+      ? await leerTodasLasFilas<{ sesion_id: string; estado: string }>(
+          (desde, hasta) =>
+            supabase
+              .from("asistencias")
+              .select("sesion_id, estado")
+              .in("sesion_id", sesionIds)
+              .order("id", { ascending: true })
+              .range(desde, hasta)
+        )
+      : [];
 
   const conteoPorSesion = new Map<
     string,

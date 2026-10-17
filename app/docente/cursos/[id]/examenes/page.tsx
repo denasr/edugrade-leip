@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
 import { contarPendientesTareas } from "@/lib/pendientes-docente";
+import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
 import FormularioCrearExamen from "../formulario-crear-examen";
@@ -78,15 +79,21 @@ export default async function ExamenesCurso({
   // reciente, mismo criterio que la calificación final usa en todas partes
   // (ver lib/calificacion-final.ts). Sin esto, "presentados" y el promedio
   // contarían cada intento como si fuera un estudiante distinto.
-  const { data: entregasExamen } = (
+  // Por páginas: crece con estudiantes × exámenes × intentos (ver
+  // lib/leer-todas-las-filas.ts). `id` desempata created_at para que el
+  // orden sea único entre páginas.
+  const entregasExamen =
     examenIds.length > 0
-      ? await supabase
-          .from("entregas")
-          .select("actividad_id, estudiante_id, evaluaciones(calificacion_final)")
-          .in("actividad_id", examenIds)
-          .order("created_at", { ascending: true })
-      : { data: [] }
-  ) as { data: EntregaExamen[] | null };
+      ? await leerTodasLasFilas<EntregaExamen>((desde, hasta) =>
+          supabase
+            .from("entregas")
+            .select("actividad_id, estudiante_id, evaluaciones(calificacion_final)")
+            .in("actividad_id", examenIds)
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true })
+            .range(desde, hasta)
+        )
+      : [];
 
   const entregaMasRecientePorEstudiante = new Map<string, EntregaExamen>(
     (entregasExamen ?? []).map((e) => [`${e.actividad_id}:${e.estudiante_id}`, e])
