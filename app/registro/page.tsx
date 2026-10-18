@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-type Rol = "DOCENTE" | "ESTUDIANTE";
 type Resultado = { tipo: "REVISAR_CORREO"; correo: string };
 
 export default function RegistroPage() {
   const router = useRouter();
-  const [rol, setRol] = useState<Rol>("ESTUDIANTE");
   const [nombreCompleto, setNombreCompleto] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +26,9 @@ export default function RegistroPage() {
       email,
       password,
       options: {
-        data: { rol, nombre_completo: nombreCompleto },
+        // El rol ya no se elige aquí: lo asigna handle_new_user según si el
+        // correo está en docentes_autorizados (migración 20261017120000).
+        data: { nombre_completo: nombreCompleto },
       },
     });
 
@@ -44,9 +44,14 @@ export default function RegistroPage() {
     // router.refresh() sincroniza las cookies de sesión que dejó el cliente
     // de Supabase antes de navegar, para que /docente o /estudiante (Server
     // Components) ya vean al usuario autenticado.
-    if (data.session) {
+    if (data.session && data.user) {
+      const { data: perfil } = await supabase
+        .from("perfiles")
+        .select("rol")
+        .eq("id", data.user.id)
+        .single();
       router.refresh();
-      router.push(rol === "DOCENTE" ? "/docente" : "/estudiante");
+      router.push(perfil?.rol === "DOCENTE" ? "/docente" : "/estudiante");
       return;
     }
 
@@ -78,28 +83,6 @@ export default function RegistroPage() {
         </h1>
 
         <div className="mt-6 flex flex-col gap-4">
-          <fieldset className="flex gap-4">
-            <legend className="mb-1 text-sm font-medium text-ink/80">
-              Rol
-            </legend>
-            {(["ESTUDIANTE", "DOCENTE"] as const).map((opcion) => (
-              <label
-                key={opcion}
-                className="flex items-center gap-2 text-sm text-ink/80"
-              >
-                <input
-                  type="radio"
-                  name="rol"
-                  value={opcion}
-                  checked={rol === opcion}
-                  onChange={() => setRol(opcion)}
-                  className="accent-verde-bosque"
-                />
-                {opcion === "ESTUDIANTE" ? "Estudiante" : "Docente"}
-              </label>
-            ))}
-          </fieldset>
-
           <label className="flex flex-col gap-1 text-sm text-ink/80">
             Nombre completo
             <input

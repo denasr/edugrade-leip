@@ -49,7 +49,7 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   ningún formulario la muestra ni la escribe. No reactivarla sin decisión explícita.
 
 ## Roles
-- **DOCENTE**: crea cursos (con clave de acceso) y define ahí la ponderación de tareas,
+- **DOCENTE** (solo correos en `docentes_autorizados`, ver abajo): crea cursos (con clave de acceso) y define ahí la ponderación de tareas,
   exámenes y asistencia; publica actividades (tarea o examen) y puede editarlas después
   (incluso con entregas ya recibidas); adjunta material de apoyo; revisa entregas y
   califica tareas; toma asistencia por sesión (una por día).
@@ -203,6 +203,17 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `asistencias_delete_docente`; no hizo falta migración. Antes ninguna fase los tocaba: el
   16-oct-2026 se borraron 24 registros sueltos de 5 estudiantes ya no inscritos (respaldo
   local en `backups/2026-10-16-asistencias-sueltas/`, fuera de Git).
+- **Alta de docentes solo por lista de correos autorizados.** `/registro` ya no deja elegir
+  rol. `handle_new_user` (migración `20261017120000`) asigna `DOCENTE` solo si el correo
+  está en `docentes_autorizados`, y `ESTUDIANTE` en cualquier otro caso; ignora el `rol`
+  que venga en `user_metadata` (antes lo respetaba, y cualquiera podía registrarse como
+  docente llamando a `signUp()` directo, sin el formulario). La tabla no tiene ninguna
+  policy: se administra desde el editor SQL de Supabase o con la secret key. Para sumar a
+  un docente: `insert into docentes_autorizados (correo) values ('...')` **justo antes**
+  de que se registre — "Confirm email" está desactivado, así que un correo autorizado sin
+  cuenta lo podría registrar otra persona primero. La lista solo importa al crear la
+  cuenta (el rol queda fijo desde el alta). En las pruebas e2e, `crearCuenta("DOCENTE")`
+  autoriza el correo de prueba solo mientras crea la cuenta y lo quita enseguida.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,

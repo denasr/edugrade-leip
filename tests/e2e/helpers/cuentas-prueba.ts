@@ -34,12 +34,31 @@ export async function crearCuenta(
   etiqueta: string
 ): Promise<CuentaPrueba> {
   const email = correoPrueba(etiqueta);
+
+  // El rol ya no sale de user_metadata: handle_new_user da DOCENTE solo si
+  // el correo está en docentes_autorizados (migración 20261017120000). El
+  // correo de prueba se autoriza nada más mientras se crea la cuenta y se
+  // quita enseguida (el rol queda fijo desde el alta).
+  if (rol === "DOCENTE") {
+    const { error: errorLista } = await admin()
+      .from("docentes_autorizados")
+      .insert({ correo: email });
+    if (errorLista) {
+      throw new Error(
+        `No se pudo autorizar el correo de prueba como docente (¿falta aplicar la migración 20261017120000?): ${errorLista.message}`
+      );
+    }
+  }
+
   const { data, error } = await admin().auth.admin.createUser({
     email,
     password: PASSWORD_PRUEBA,
     email_confirm: true,
-    user_metadata: { rol, nombre_completo: `E2E ${etiqueta}` },
+    user_metadata: { nombre_completo: `E2E ${etiqueta}` },
   });
+  if (rol === "DOCENTE") {
+    await admin().from("docentes_autorizados").delete().eq("correo", email);
+  }
   if (error || !data.user) {
     throw new Error(`No se pudo crear la cuenta de prueba (${etiqueta}): ${error?.message}`);
   }
