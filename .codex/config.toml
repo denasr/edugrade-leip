@@ -1,0 +1,3 @@
+[mcp_servers.notebooklm]
+command = "npx"
+args = ["notebooklm-mcp@latest"]
