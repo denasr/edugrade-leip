@@ -214,6 +214,23 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   cuenta lo podría registrar otra persona primero. La lista solo importa al crear la
   cuenta (el rol queda fijo desde el alta). En las pruebas e2e, `crearCuenta("DOCENTE")`
   autoriza el correo de prueba solo mientras crea la cuenta y lo quita enseguida.
+- **Reporte de desempeño del estudiante (PDF).** Botón "Descargar mi reporte (PDF)" en
+  `/estudiante/cursos/[id]`, bajo la calificación final. Lo genera en el servidor
+  `app/estudiante/cursos/[id]/reporte/route.ts` con `pdf-lib` (fuentes estándar de PDF:
+  cubren acentos y ñ; cualquier carácter fuera de WinAnsi se sustituye por "?" en vez de
+  tronar). Incluye promedio general con su desglose, asistencias / faltas / justificadas,
+  pendientes y el detalle de cada tarea y examen. Los datos y cálculos salen de
+  `obtenerResumenCursoEstudiante` (`lib/resumen-curso-estudiante.ts`), la misma función
+  que usa la página del curso — el PDF nunca puede dar un número distinto al de la
+  pantalla, mismo criterio que `lib/libro-calificaciones.ts`. Situación de cada actividad
+  (`situacionActividad`): calificada, entregada sin calificar, **por entregar** (sigue
+  abierta), **no entregada** (ya pasó su cierre) o **aún no disponible** (no abre todavía
+  o el docente la bloqueó antes del cierre; no cuenta ni como pendiente ni como falta). Una
+  entrega de tarea a medias (sin archivos ni calificación) cuenta como no entregada,
+  igual que en la tarjeta (`tieneEntregaReal`). Solo el propio estudiante inscrito: la
+  ruta responde 401 sin sesión, 403 a un docente y 404 a un estudiante no inscrito. Las
+  fechas se muestran en hora de `America/Mexico_City`. La prueba e2e lee el texto del PDF
+  con `unpdf` (solo dependencia de desarrollo).
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
