@@ -45,7 +45,7 @@ export default async function EstudiantesCurso({
   // llamada.
   const { data: inscripciones } = await supabase
     .from("inscripciones")
-    .select("estudiante_id")
+    .select("estudiante_id, created_at")
     .eq("curso_id", id);
 
   const estudianteIds = (inscripciones ?? []).map((i) => i.estudiante_id);
@@ -95,31 +95,40 @@ export default async function EstudiantesCurso({
             Todavía no hay estudiantes inscritos en este curso.
           </p>
         ) : (
-          <ul className="flex flex-col gap-3">
-            {estudiantesInscritos.map((estudiante) => (
-              <li
-                key={estudiante.id}
-                className="card flex items-center justify-between gap-3 p-4"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-ink">
-                    {estudiante.nombre_completo}
-                  </p>
-                  <p className="truncate text-sm text-ink/70">
-                    {estudiante.correo}
-                  </p>
-                </div>
-                <ModalEliminarEstudiante
-                  accion={eliminarEstudianteDeCurso.bind(
-                    null,
-                    curso.id,
-                    estudiante.id
-                  )}
-                  nombreCompleto={estudiante.nombre_completo}
-                />
-              </li>
-            ))}
-          </ul>
+          <>
+            <a
+              href={`/docente/cursos/${curso.id}/estudiantes/export`}
+              className="btn-primary mb-4 inline-block"
+            >
+              Exportar a Excel
+            </a>
+
+            <ul className="flex flex-col gap-3">
+              {estudiantesInscritos.map((estudiante) => (
+                <li
+                  key={estudiante.id}
+                  className="card flex items-center justify-between gap-3 p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-ink">
+                      {estudiante.nombre_completo}
+                    </p>
+                    <p className="truncate text-sm text-ink/70">
+                      {estudiante.correo}
+                    </p>
+                  </div>
+                  <ModalEliminarEstudiante
+                    accion={eliminarEstudianteDeCurso.bind(
+                      null,
+                      curso.id,
+                      estudiante.id
+                    )}
+                    nombreCompleto={estudiante.nombre_completo}
+                  />
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
     </main>
