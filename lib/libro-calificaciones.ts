@@ -1,6 +1,8 @@
 import type { createClient } from "@/lib/supabase/server";
 import { compararPorCierre } from "@/lib/actividades";
 import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { finalizarIntentosVencidos } from "@/lib/intentos-examen";
 import {
   calcularCalificacionFinal,
   calcularPorcentajeAsistencia,
@@ -90,6 +92,13 @@ export async function obtenerLibroCalificaciones(
     ...(tareas ?? []).map((a) => a.id),
     ...(examenes ?? []).map((e) => e.id),
   ];
+
+  // Antes de leer entregas: los intentos con tiempo que vencieron sin que
+  // el estudiante los enviara se entregan aquí con su último avance (ver
+  // lib/intentos-examen.ts).
+  // Quien llama (la página y la exportación) ya verificó que el curso es
+  // del docente.
+  await finalizarIntentosVencidos(createAdminClient(), { actividadIds });
 
   type EntregaConEstudiante = {
     actividad_id: string;

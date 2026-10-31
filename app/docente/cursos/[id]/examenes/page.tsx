@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
 import { contarPendientesCurso } from "@/lib/pendientes-docente";
+import { finalizarIntentosVencidos } from "@/lib/intentos-examen";
 import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
@@ -52,7 +53,7 @@ export default async function ExamenesCurso({
     supabase
       .from("actividades")
       .select(
-        "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos, orden_aleatorio"
+        "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos, orden_aleatorio, limite_minutos"
       )
       .eq("curso_id", id)
       .eq("tipo", "EXAMEN")
@@ -63,6 +64,11 @@ export default async function ExamenesCurso({
   examenes?.sort(compararPorCierre);
 
   const examenIds = (examenes ?? []).map((e) => e.id);
+
+  // Antes de leer entregas: los intentos con tiempo que vencieron sin que
+  // el estudiante los enviara se entregan aquí con su último avance (ver
+  // lib/intentos-examen.ts).
+  await finalizarIntentosVencidos(createAdminClient(), { actividadIds: examenIds });
 
   // evaluaciones.entrega_id es UNIQUE, así que Postgrest lo embebe como
   // objeto (o null), no como arreglo.

@@ -350,6 +350,28 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   - `contarPendientesCurso` (antes `contarPendientesTareas`) cuenta pendientes de tareas
     y de exámenes por separado, y la franja de pestañas muestra el número también en
     "Exámenes".
+- **Límite de tiempo (exámenes y cuestionarios).** Migración `20261101150000`:
+  `actividades.limite_minutos` (opcional, 1–600) y la tabla `intentos_examen`. Lógica en
+  `lib/intentos-examen.ts`.
+  - El estudiante ve "Comenzar examen"; las preguntas **no se mandan al navegador** hasta
+    que hay un intento en curso. `iniciarExamen` crea el intento con
+    `vence_at = min(ahora + límite, fecha_cierre)` y es idempotente si ya hay uno abierto.
+  - Reloj con la hora del servidor (`ahoraServidor`, para no depender del reloj del
+    teléfono). El avance se guarda solo (`guardarAvanceExamen`, 1.5 s después del último
+    cambio) en `borrador`; recargar no reinicia el reloj ni pierde respuestas. Al llegar a
+    cero se envía solo, sin exigir todas las respuestas.
+  - Todo intento con límite se entrega por `finalizarIntento` (secret key): primero lo
+    "reclama" con un update condicional de `finalizado_at` para que dos pantallas no creen
+    dos entregas, y no crea nada si el estudiante ya no está inscrito. Tras `GRACIA_MS`
+    (2 min) después de vencer, ya no se aceptan respuestas nuevas: se usa el borrador.
+  - Intento abandonado (se le cerró la página): no hay cron. `finalizarIntentosVencidos`
+    se corre al abrir las pantallas que muestran calificaciones de ese examen (curso y
+    reporte del estudiante, pestañas Tareas y Exámenes, respuestas escritas y libro de
+    calificaciones), así que la entrega existe antes de que alguien vea una nota.
+  - `presentarExamen` rechaza un examen con límite que llegue sin `intento_id`.
+  - RLS: `intentos_examen` solo tiene policy de lectura (el estudiante los suyos, el
+    docente los de sus actividades); toda escritura va con la secret key tras verificar
+    con RLS. Se copia `limite_minutos` al duplicar o copiar la actividad.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
@@ -522,6 +544,21 @@ create table anuncios (
   fijado boolean not null default false,
   created_at timestamptz not null default now(),
   editado_at timestamptz -- solo al editar el texto, no al fijar
+);
+
+-- Agregada en 20261101150000_add_limite_tiempo_examen.sql (más
+-- actividades.limite_minutos smallint, null = sin límite, 1 a 600)
+create table intentos_examen (
+  id uuid primary key default gen_random_uuid(),
+  actividad_id uuid not null references actividades(id) on delete cascade,
+  estudiante_id uuid not null references auth.users(id),
+  intento smallint not null,
+  iniciado_at timestamptz not null default now(),
+  vence_at timestamptz not null,
+  borrador jsonb not null default '{}'::jsonb, -- avance guardado {pregunta_id: respuesta}
+  finalizado_at timestamptz,                    -- null = en curso
+  entrega_id uuid references entregas(id) on delete set null,
+  unique (actividad_id, estudiante_id, intento)
 );
 ```
 

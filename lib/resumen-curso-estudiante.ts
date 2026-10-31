@@ -1,5 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { finalizarIntentosVencidos } from "@/lib/intentos-examen";
 import { compararPorCierre, estadoActividad } from "@/lib/actividades";
 import {
   calcularCalificacionFinal,
@@ -42,6 +43,7 @@ type TareaCruda = {
   bloqueado_manual: boolean;
   visible_estudiantes: boolean;
   orden_aleatorio: boolean;
+  limite_minutos: number | null;
   materiales_actividad: { nombre_archivo: string; storage_path: string }[];
 };
 
@@ -55,6 +57,7 @@ type ExamenCrudo = {
   visible_estudiantes: boolean;
   intentos_permitidos: number;
   orden_aleatorio: boolean;
+  limite_minutos: number | null;
 };
 
 export type TareaDelEstudiante = TareaCruda & {
@@ -116,12 +119,16 @@ export async function obtenerResumenCursoEstudiante(
   if (!curso) return null;
 
   const admin = createAdminClient();
+  // Antes de leer entregas: los intentos con tiempo que vencieron sin que
+  // el estudiante los enviara se entregan aquí con su último avance (ver
+  // lib/intentos-examen.ts).
+  await finalizarIntentosVencidos(admin, { estudianteId });
 
   // ---- Tareas (incluye cuestionarios) ----
   const { data: tareasCrudas } = (await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, orden_aleatorio, materiales_actividad(nombre_archivo, storage_path)"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, orden_aleatorio, limite_minutos, materiales_actividad(nombre_archivo, storage_path)"
     )
     .eq("curso_id", cursoId)
     .eq("tipo", "TAREA")
@@ -174,7 +181,7 @@ export async function obtenerResumenCursoEstudiante(
   const { data: examenesCrudos } = (await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos, orden_aleatorio"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos, orden_aleatorio, limite_minutos"
     )
     .eq("curso_id", cursoId)
     .eq("tipo", "EXAMEN")

@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
-import { presentarExamen, type EstadoExamen } from "./actions";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { guardarAvanceExamen, presentarExamen, type EstadoExamen } from "./actions";
 import { LARGO_MAXIMO_RESPUESTA_ABIERTA } from "@/lib/calificar-examen";
+import type { IntentoActivo } from "@/lib/intentos-examen";
 import { useToast } from "../../../toast-provider";
 
 type Pregunta = {
@@ -20,16 +21,33 @@ const estadoInicial: EstadoExamen = { error: null };
 // ignora (la persona solo estaba haciendo scroll).
 const UMBRAL_DESLIZAR = 50;
 
+// Cuánto esperar después del último cambio para guardar el avance de un
+// examen con tiempo: suficiente para no mandar una petición por cada letra.
+const ESPERA_GUARDADO_MS = 1500;
+
+function formatoReloj(segundos: number): string {
+  const m = Math.floor(segundos / 60);
+  const s = segundos % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 export default function FormularioPresentarExamen({
   actividadId,
   cursoId,
   preguntas,
   etiquetaIntento,
+  intento,
+  ahoraServidor,
 }: {
   actividadId: string;
   cursoId: string;
   preguntas: Pregunta[];
   etiquetaIntento?: string;
+  // Solo en exámenes con límite de tiempo: el intento en curso (con su
+  // avance guardado) y la hora del servidor al cargar la página, para que
+  // el reloj no dependa de si la hora del teléfono está bien.
+  intento?: IntentoActivo;
+  ahoraServidor?: string;
 }) {
   const { mostrar } = useToast();
   const [indice, setIndice] = useState(0);
@@ -41,8 +59,57 @@ export default function FormularioPresentarExamen({
   // ya marcadas en las demás (confirmado en vivo). Con el radio controlado,
   // React vuelve a aplicar `checked` desde este estado en el siguiente
   // render sin importar ese reseteo interno.
-  const [respuestas, setRespuestas] = useState<Record<string, string>>({});
+  const [respuestas, setRespuestas] = useState<Record<string, string>>(
+    intento?.borrador ?? {}
+  );
   const inicioToque = useRef<{ x: number; y: number } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // ---- Límite de tiempo ----
+  const [segundosRestantes, setSegundosRestantes] = useState<number | null>(null);
+  const [estadoGuardado, setEstadoGuardado] = useState<"" | "guardando" | "guardado" | "error">("");
+  // Envío automático al llegar a cero: se salta la validación de "responde
+  // todas" (se entrega lo que haya).
+  const tiempoAgotado = useRef(false);
+  const primeraCarga = useRef(true);
+
+  useEffect(() => {
+    if (!intento || !ahoraServidor) return;
+    // Diferencia entre el reloj del teléfono y el del servidor, medida una
+    // vez al cargar.
+    const desfase = new Date(ahoraServidor).getTime() - Date.now();
+    const vence = new Date(intento.venceAt).getTime();
+    const actualizar = () => {
+      const restante = Math.max(0, Math.ceil((vence - (Date.now() + desfase)) / 1000));
+      setSegundosRestantes(restante);
+      if (restante === 0 && !tiempoAgotado.current) {
+        tiempoAgotado.current = true;
+        formRef.current?.requestSubmit();
+      }
+    };
+    const primero = setTimeout(actualizar, 0);
+    const reloj = setInterval(actualizar, 1000);
+    return () => {
+      clearTimeout(primero);
+      clearInterval(reloj);
+    };
+  }, [intento, ahoraServidor]);
+
+  // Guarda el avance en el servidor un momento después de cada cambio: si
+  // se le cierra la página, se entrega con esto al vencer el tiempo.
+  useEffect(() => {
+    if (!intento) return;
+    if (primeraCarga.current) {
+      primeraCarga.current = false;
+      return;
+    }
+    const temporizador = setTimeout(async () => {
+      setEstadoGuardado("guardando");
+      const resultado = await guardarAvanceExamen(intento.id, respuestas);
+      setEstadoGuardado(resultado.error ? "error" : "guardado");
+    }, ESPERA_GUARDADO_MS);
+    return () => clearTimeout(temporizador);
+  }, [intento, respuestas]);
 
   const esPrimera = indice === 0;
   const esUltima = indice === preguntas.length - 1;
@@ -96,7 +163,7 @@ export default function FormularioPresentarExamen({
     // contra formData): si falta alguna, se salta directo a la primera sin
     // responder en vez de llamar al servidor.
     const faltante = preguntas.findIndex((p) => !respuestas[p.id]?.trim());
-    if (faltante !== -1) {
+    if (faltante !== -1 && !tiempoAgotado.current) {
       irA(faltante);
       return { error: `Responde la pregunta ${faltante + 1} antes de enviar.` };
     }
@@ -109,9 +176,12 @@ export default function FormularioPresentarExamen({
     );
     if (!resultado.error) {
       mostrar(
-        resultado.pendiente
-          ? "Examen enviado. Tu docente calificará tus respuestas escritas."
-          : "Examen enviado."
+        resultado.aviso ??
+          (tiempoAgotado.current
+            ? "Se acabó el tiempo: tu examen se entregó con lo que contestaste."
+            : resultado.pendiente
+              ? "Examen enviado. Tu docente calificará tus respuestas escritas."
+              : "Examen enviado.")
       );
     }
     return resultado;
@@ -124,9 +194,31 @@ export default function FormularioPresentarExamen({
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       className="mt-3 flex flex-col gap-4 border-t border-verde-bosque/15 pt-3"
     >
+      {intento && <input type="hidden" name="intento_id" value={intento.id} />}
+      {intento && segundosRestantes !== null && (
+        <div
+          role="timer"
+          aria-live="off"
+          className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+            segundosRestantes <= 60 ? "bg-terracota/10 text-terracota" : "bg-verde-bosque/8 text-verde-bosque"
+          }`}
+        >
+          <span>Tiempo restante: {formatoReloj(segundosRestantes)}</span>
+          <span className="text-xs font-normal text-ink/70">
+            {estadoGuardado === "guardando"
+              ? "Guardando…"
+              : estadoGuardado === "guardado"
+                ? "Avance guardado"
+                : estadoGuardado === "error"
+                  ? "No se pudo guardar"
+                  : ""}
+          </span>
+        </div>
+      )}
       {etiquetaIntento && (
         <p className="text-xs font-medium text-verde-bosque">{etiquetaIntento}</p>
       )}

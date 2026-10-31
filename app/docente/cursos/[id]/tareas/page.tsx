@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { contarPendientesCurso } from "@/lib/pendientes-docente";
+import { finalizarIntentosVencidos } from "@/lib/intentos-examen";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
 import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
@@ -53,7 +54,7 @@ export default async function TareasCurso({
   const { data: actividades } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, orden_aleatorio, materiales_actividad(nombre_archivo)"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, orden_aleatorio, limite_minutos, materiales_actividad(nombre_archivo)"
     )
     .eq("curso_id", id)
     .eq("tipo", "TAREA")
@@ -70,6 +71,11 @@ export default async function TareasCurso({
   // policy de RLS (ver CLAUDE.md), así que esta consulta va con la secret
   // key — el curso ya se verificó como propio del docente arriba.
   const admin = createAdminClient();
+  // Antes de leer entregas: los intentos con tiempo que vencieron sin que
+  // el estudiante los enviara se entregan aquí con su último avance (ver
+  // lib/intentos-examen.ts).
+  await finalizarIntentosVencidos(admin, { actividadIds });
+
   const { data: preguntasTodas } =
     actividadIds.length > 0
       ? await admin

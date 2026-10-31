@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calificarExamen, type TipoPregunta } from "@/lib/calificar-examen";
+import { finalizarIntentosVencidos } from "@/lib/intentos-examen";
 import FormularioRespuestasAbiertas from "./formulario-respuestas-abiertas";
 
 type ActividadConCurso = {
@@ -69,6 +70,11 @@ export default async function RespuestasAbiertas({
 
   // preguntas_examen no tiene policy: secret key, ya verificado el dueño.
   const admin = createAdminClient();
+  // Antes de leer entregas: los intentos con tiempo que vencieron sin que
+  // el estudiante los enviara se entregan aquí con su último avance (ver
+  // lib/intentos-examen.ts).
+  await finalizarIntentosVencidos(admin, { actividadIds: [id] });
+
   const { data: preguntas } = (await admin
     .from("preguntas_examen")
     .select("id, tipo, enunciado, correcta, puntos")

@@ -11,6 +11,7 @@ export type ActividadOrigen = {
   instrucciones: string | null;
   intentos_permitidos: number;
   orden_aleatorio: boolean;
+  limite_minutos: number | null;
 };
 
 // Crea una copia de una actividad en otro curso (o en el mismo): mismos
@@ -40,6 +41,7 @@ export async function duplicarActividad(
       fecha_cierre: fechas.fecha_cierre,
       intentos_permitidos: origen.intentos_permitidos,
       orden_aleatorio: origen.orden_aleatorio,
+      limite_minutos: origen.limite_minutos,
       visible_estudiantes: false,
     })
     .select("id")

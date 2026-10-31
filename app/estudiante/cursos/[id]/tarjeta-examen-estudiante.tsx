@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import type { IntentoActivo } from "@/lib/intentos-examen";
 import { ChevronDown } from "lucide-react";
 import {
   estadoActividad,
@@ -10,7 +12,7 @@ import {
 } from "@/lib/actividades";
 import AvisoPorVencer from "../../aviso-por-vencer";
 import FormularioPresentarExamen from "./formulario-presentar-examen";
-import { obtenerRevisionExamen, type PreguntaRevisada } from "./actions";
+import { iniciarExamen, obtenerRevisionExamen, type PreguntaRevisada } from "./actions";
 
 type Entrega = {
   id: string;
@@ -41,6 +43,11 @@ type Examen = {
   // que antes de que existiera esta función.
   intentosPermitidos?: number;
   intentosUsados?: number;
+  // Límite de tiempo (lib/intentos-examen.ts). Sin límite, todo igual que
+  // antes; con límite, las preguntas solo llegan con un intento en curso.
+  limiteMinutos?: number | null;
+  intentoActivo?: IntentoActivo | null;
+  ahoraServidor?: string;
 };
 
 export default function TarjetaExamenEstudiante({
@@ -56,6 +63,19 @@ export default function TarjetaExamenEstudiante({
   const intentosUsados = examen.intentosUsados ?? (examen.entrega ? 1 : 0);
   const intentosRestantes = intentosPermitidos - intentosUsados;
   const puedeIntentarDeNuevo = estado === "ABIERTA" && intentosRestantes > 0;
+  const conLimite = Boolean(examen.limiteMinutos);
+  const router = useRouter();
+  const [comenzando, iniciarTransicion] = useTransition();
+  const [errorInicio, setErrorInicio] = useState<string | null>(null);
+
+  function comenzar() {
+    setErrorInicio(null);
+    iniciarTransicion(async () => {
+      const resultado = await iniciarExamen(examen.id, cursoId);
+      if (resultado.error) setErrorInicio(resultado.error);
+      else router.refresh();
+    });
+  }
 
   // Un examen sin preguntas abiertas trae evaluación desde que se entrega;
   // uno con abiertas queda "pendiente de calificar" hasta que el docente
@@ -253,11 +273,37 @@ export default function TarjetaExamenEstudiante({
         </div>
       )}
 
-      {puedeIntentarDeNuevo ? (
+      {puedeIntentarDeNuevo && conLimite && !examen.intentoActivo ? (
+        <div className="mt-3 border-t border-verde-bosque/15 pt-3 text-sm">
+          <p className="text-ink/80">
+            Tienes <strong>{examen.limiteMinutos} minutos</strong> desde que lo
+            comiences. Al acabarse el tiempo se entrega solo con lo que hayas
+            contestado; tu avance se guarda mientras respondes.
+          </p>
+          {errorInicio && <p className="mt-2 text-terracota">{errorInicio}</p>}
+          <button
+            type="button"
+            onClick={comenzar}
+            disabled={comenzando}
+            className="btn-primary mt-3"
+          >
+            {comenzando
+              ? "Comenzando…"
+              : intentosPermitidos > 1
+                ? `Comenzar intento ${intentosUsados + 1} de ${intentosPermitidos}`
+                : "Comenzar examen"}
+          </button>
+        </div>
+      ) : puedeIntentarDeNuevo ? (
         <FormularioPresentarExamen
+          // key: al empezar un intento nuevo, el formulario arranca de cero
+          // con su avance guardado en vez de conservar el del anterior.
+          key={examen.intentoActivo?.id ?? "sin-limite"}
           actividadId={examen.id}
           cursoId={cursoId}
           preguntas={examen.preguntas}
+          intento={examen.intentoActivo ?? undefined}
+          ahoraServidor={examen.ahoraServidor}
           etiquetaIntento={
             intentosPermitidos > 1
               ? `Intento ${intentosUsados + 1} de ${intentosPermitidos}`

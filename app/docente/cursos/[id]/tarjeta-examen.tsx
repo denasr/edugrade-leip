@@ -23,6 +23,7 @@ type Examen = {
   // que el default de abajo ya refleja ese caso correctamente.
   intentos_permitidos?: number;
   orden_aleatorio?: boolean;
+  limite_minutos?: number | null;
 };
 
 type Pregunta = {
@@ -76,6 +77,7 @@ export default function TarjetaExamen({
             preguntas,
             intentosPermitidos: examen.intentos_permitidos,
             ordenAleatorio: examen.orden_aleatorio,
+            limiteMinutos: examen.limite_minutos,
           }}
           tieneRespuestas={stats.presentados > 0}
           onCancelar={() => setEditando(false)}
@@ -153,6 +155,11 @@ export default function TarjetaExamen({
         <div className="flex shrink-0 items-center gap-1.5">
           {!examen.visible_estudiantes && (
             <span className="badge-oculta">Oculta</span>
+          )}
+          {examen.limite_minutos && (
+            <span className="inline-block shrink-0 rounded-full bg-verde-bosque/8 px-2.5 py-0.5 text-xs font-medium text-verde-bosque">
+              {examen.limite_minutos} min
+            </span>
           )}
           {examen.orden_aleatorio && (
             <span className="inline-block shrink-0 rounded-full bg-verde-bosque/8 px-2.5 py-0.5 text-xs font-medium text-verde-bosque">

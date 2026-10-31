@@ -8,11 +8,21 @@ import {
   LARGO_MAXIMO_RESPUESTA_ABIERTA,
   type PreguntaParaCalificar,
 } from "@/lib/calificar-examen";
+import { estadoActividad } from "@/lib/actividades";
+import {
+  COLUMNAS_INTENTO,
+  dentroDelTiempo,
+  finalizarIntento,
+  finalizarIntentosVencidos,
+  limpiarRespuestas,
+  type IntentoExamen,
+} from "@/lib/intentos-examen";
 
 export type EstadoEntrega = { error: string | null };
 // `pendiente`: se registró, pero tiene preguntas abiertas que el docente
-// todavía tiene que calificar (no hay nota todavía).
-export type EstadoExamen = { error: string | null; pendiente?: boolean };
+// todavía tiene que calificar (no hay nota todavía). `aviso`: se registró,
+// pero conviene explicarle algo (p. ej. que se acabó el tiempo).
+export type EstadoExamen = { error: string | null; pendiente?: boolean; aviso?: string };
 
 // Vercel impone su propio límite de payload (~4.5 MB) a las Serverless
 // Functions, por delante y de forma independiente de cualquier
@@ -252,6 +262,21 @@ export async function presentarExamen(
 
     if (!user) {
       return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+    }
+
+    const intentoId = String(formData.get("intento_id") ?? "");
+    if (intentoId) {
+      return await presentarIntentoConTiempo(supabase, user.id, intentoId, cursoId, formData);
+    }
+    // Un examen con límite de tiempo solo se entrega por su intento; si no,
+    // bastaría con mandar el formulario sin intento_id para saltarse el reloj.
+    const { data: actividadConLimite } = await supabase
+      .from("actividades")
+      .select("limite_minutos")
+      .eq("id", actividadId)
+      .maybeSingle();
+    if (actividadConLimite?.limite_minutos) {
+      return { error: "Este examen tiene límite de tiempo: primero presiona \"Comenzar\"." };
     }
 
     const respuestas: { pregunta_id: string; respuesta_seleccionada: string }[] =
@@ -501,4 +526,185 @@ export async function obtenerRevisionExamen(
       preguntas: null,
     };
   }
+}
+
+// ---- Exámenes con límite de tiempo (lib/intentos-examen.ts) ----
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+function respuestasDelFormulario(formData: FormData): Record<string, string> {
+  const respuestas: Record<string, string> = {};
+  for (const [nombre, valor] of formData.entries()) {
+    if (nombre.startsWith("respuesta-") && typeof valor === "string") {
+      respuestas[nombre.slice("respuesta-".length)] = valor;
+    }
+  }
+  return respuestas;
+}
+
+// El intento se lee con el cliente normal (RLS: solo los propios), así que
+// encontrarlo ya prueba que es de este estudiante.
+async function intentoPropio(
+  supabase: SupabaseServerClient,
+  estudianteId: string,
+  intentoId: string
+): Promise<IntentoExamen | null> {
+  const { data } = await supabase
+    .from("intentos_examen")
+    .select(COLUMNAS_INTENTO)
+    .eq("id", intentoId)
+    .eq("estudiante_id", estudianteId)
+    .maybeSingle();
+  return (data as IntentoExamen | null) ?? null;
+}
+
+async function presentarIntentoConTiempo(
+  supabase: SupabaseServerClient,
+  estudianteId: string,
+  intentoId: string,
+  cursoId: string,
+  formData: FormData
+): Promise<EstadoExamen> {
+  const intento = await intentoPropio(supabase, estudianteId, intentoId);
+  if (!intento) return { error: "No se encontró tu intento. Recarga la página." };
+  if (intento.finalizado_at) return { error: "Este intento ya se había entregado." };
+
+  // A tiempo (con el margen de GRACIA_MS): cuenta lo que mandó. Tarde: solo
+  // lo que alcanzó a guardar antes de que venciera.
+  const aTiempo = dentroDelTiempo(intento.vence_at);
+  const admin = createAdminClient();
+  const resultado = await finalizarIntento(
+    admin,
+    intento,
+    aTiempo ? respuestasDelFormulario(formData) : undefined
+  );
+
+  revalidatePath(`/estudiante/cursos/${cursoId}`);
+  if (resultado.error) return { error: resultado.error };
+  return {
+    error: null,
+    pendiente: resultado.pendiente,
+    aviso: aTiempo ? undefined : "Se acabó el tiempo: se entregó lo último que tenías guardado.",
+  };
+}
+
+export type EstadoIniciarExamen = { error: string | null };
+
+// "Comenzar examen": abre un intento con su hora de vencimiento (inicio +
+// límite, o el cierre del examen si llega antes). Si ya hay uno abierto, no
+// crea otro: recargar la página o volver a presionar no da más tiempo.
+export async function iniciarExamen(
+  actividadId: string,
+  cursoId: string
+): Promise<EstadoIniciarExamen> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+
+  // RLS: el estudiante solo lee actividades visibles de sus cursos.
+  const { data: actividad } = await supabase
+    .from("actividades")
+    .select(
+      "id, curso_id, limite_minutos, intentos_permitidos, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes"
+    )
+    .eq("id", actividadId)
+    .maybeSingle();
+
+  if (!actividad || !actividad.visible_estudiantes || !actividad.limite_minutos) {
+    return { error: "No se puede comenzar este examen." };
+  }
+  if (estadoActividad(actividad) !== "ABIERTA") {
+    return { error: "Este examen no está abierto." };
+  }
+
+  const admin = createAdminClient();
+  await finalizarIntentosVencidos(admin, { actividadIds: [actividadId], estudianteId: user.id });
+
+  const { data: abierto } = await supabase
+    .from("intentos_examen")
+    .select("id")
+    .eq("actividad_id", actividadId)
+    .eq("estudiante_id", user.id)
+    .is("finalizado_at", null)
+    .maybeSingle();
+  if (abierto) {
+    revalidatePath(`/estudiante/cursos/${cursoId}`);
+    return { error: null };
+  }
+
+  const { count: usados } = await supabase
+    .from("entregas")
+    .select("id", { count: "exact", head: true })
+    .eq("actividad_id", actividadId)
+    .eq("estudiante_id", user.id);
+  if ((usados ?? 0) >= actividad.intentos_permitidos) {
+    return { error: "Ya usaste todos tus intentos." };
+  }
+
+  const numero = (usados ?? 0) + 1;
+  const limite = Date.now() + actividad.limite_minutos * 60_000;
+  const venceAt = new Date(Math.min(limite, new Date(actividad.fecha_cierre).getTime()));
+
+  // Si el docente borró una entrega para que vuelva a presentar, queda el
+  // intento viejo (ya finalizado) con ese mismo número: se reemplaza.
+  await admin
+    .from("intentos_examen")
+    .delete()
+    .eq("actividad_id", actividadId)
+    .eq("estudiante_id", user.id)
+    .eq("intento", numero)
+    .not("finalizado_at", "is", null);
+
+  const { error } = await admin.from("intentos_examen").insert({
+    actividad_id: actividadId,
+    estudiante_id: user.id,
+    intento: numero,
+    vence_at: venceAt.toISOString(),
+  });
+  if (error) {
+    console.error("No se pudo iniciar el examen:", error);
+    return { error: "No se pudo comenzar el examen. Intenta de nuevo." };
+  }
+
+  revalidatePath(`/estudiante/cursos/${cursoId}`);
+  return { error: null };
+}
+
+// Guarda el avance de un intento con tiempo mientras el estudiante contesta
+// (el formulario lo llama unos segundos después de cada cambio). Pasado el
+// vencimiento ya no acepta nada.
+export async function guardarAvanceExamen(
+  intentoId: string,
+  respuestas: Record<string, string>
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Tu sesión expiró." };
+
+  const intento = await intentoPropio(supabase, user.id, intentoId);
+  if (!intento || intento.finalizado_at || !dentroDelTiempo(intento.vence_at)) {
+    return { error: "Este intento ya terminó." };
+  }
+
+  const admin = createAdminClient();
+  const { data: preguntas } = await admin
+    .from("preguntas_examen")
+    .select("id")
+    .eq("actividad_id", intento.actividad_id);
+  const borrador = limpiarRespuestas(respuestas, new Set((preguntas ?? []).map((p) => p.id)));
+
+  const { error } = await admin
+    .from("intentos_examen")
+    .update({ borrador })
+    .eq("id", intentoId)
+    .is("finalizado_at", null);
+  if (error) {
+    console.error("No se pudo guardar el avance del examen:", error);
+    return { error: "No se pudo guardar tu avance." };
+  }
+  return { error: null };
 }

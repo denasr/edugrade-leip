@@ -5,6 +5,7 @@ import { estadoActividad } from "@/lib/actividades";
 import { textoNotaParcial } from "@/lib/calificacion-final";
 import { obtenerResumenCursoEstudiante } from "@/lib/resumen-curso-estudiante";
 import { ordenarParaEstudiante } from "@/lib/preguntas-examen";
+import { dentroDelTiempo, type IntentoActivo } from "@/lib/intentos-examen";
 import { COLUMNAS_ANUNCIO, type Anuncio } from "@/lib/anuncios";
 import TablonAnuncios from "./tablon-anuncios";
 import TarjetaTareaEstudiante from "./tarjeta-tarea-estudiante";
@@ -45,6 +46,30 @@ export default async function DetalleCursoEstudiante({
     .order("fijado", { ascending: false })
     .order("created_at", { ascending: false })) as { data: Anuncio[] | null };
 
+  // Intentos con tiempo que el estudiante tiene en curso (los vencidos ya
+  // se entregaron en obtenerResumenCursoEstudiante). RLS: solo los suyos.
+  const { data: intentosAbiertos } = await supabase
+    .from("intentos_examen")
+    .select("id, actividad_id, vence_at, borrador")
+    .eq("estudiante_id", user.id)
+    .is("finalizado_at", null);
+  const intentoPorActividad = new Map<string, IntentoActivo>(
+    (intentosAbiertos ?? [])
+      .filter((i) => dentroDelTiempo(i.vence_at))
+      .map((i) => [
+        i.actividad_id,
+        { id: i.id, venceAt: i.vence_at, borrador: (i.borrador ?? {}) as Record<string, string> },
+      ])
+  );
+  // Para que el reloj del navegador se ajuste si el del teléfono está mal.
+  const ahoraServidor = new Date().toISOString();
+
+  // Con límite de tiempo, las preguntas no se mandan al navegador hasta que
+  // el estudiante presiona "Comenzar" (si no, podría leerlas antes de que
+  // empiece a correr su tiempo).
+  const puedeVerPreguntas = (actividad: { id: string; limite_minutos: number | null }) =>
+    !actividad.limite_minutos || intentoPorActividad.has(actividad.id);
+
   type PreguntaEstudiante = {
     id: string;
     tipo: "OPCION_MULTIPLE" | "ABIERTA";
@@ -58,7 +83,12 @@ export default async function DetalleCursoEstudiante({
       const estado = estadoActividad(actividad);
 
       let preguntas: PreguntaEstudiante[] = [];
-      if (actividad.esCuestionario && !actividad.entrega && estado === "ABIERTA") {
+      if (
+        actividad.esCuestionario &&
+        !actividad.entrega &&
+        estado === "ABIERTA" &&
+        puedeVerPreguntas(actividad)
+      ) {
         const { data } = await supabase
           .from("preguntas_examen_estudiante")
           .select("id, tipo, enunciado, opciones, puntos")
@@ -97,6 +127,8 @@ export default async function DetalleCursoEstudiante({
         preguntas,
         nombreArchivo: material?.nombre_archivo ?? null,
         enlaceDescarga,
+        intentoActivo: intentoPorActividad.get(actividad.id) ?? null,
+        ahoraServidor,
       };
     })
   );
@@ -106,7 +138,11 @@ export default async function DetalleCursoEstudiante({
       const intentosRestantes = examen.intentos_permitidos - examen.intentosUsados;
       let preguntas: PreguntaEstudiante[] = [];
 
-      if (intentosRestantes > 0 && estadoActividad(examen) === "ABIERTA") {
+      if (
+        intentosRestantes > 0 &&
+        estadoActividad(examen) === "ABIERTA" &&
+        puedeVerPreguntas(examen)
+      ) {
         const { data } = await supabase
           .from("preguntas_examen_estudiante")
           .select("id, tipo, enunciado, opciones, puntos")
@@ -122,6 +158,9 @@ export default async function DetalleCursoEstudiante({
         ...examen,
         preguntas,
         intentosPermitidos: examen.intentos_permitidos,
+        limiteMinutos: examen.limite_minutos,
+        intentoActivo: intentoPorActividad.get(examen.id) ?? null,
+        ahoraServidor,
       };
     })
   );

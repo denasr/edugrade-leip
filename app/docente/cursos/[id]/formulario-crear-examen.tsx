@@ -54,6 +54,7 @@ type ExamenExistente = {
   preguntas: PreguntaExistente[];
   intentosPermitidos?: number;
   ordenAleatorio?: boolean;
+  limiteMinutos?: number | null;
 };
 
 function preguntasIniciales(examenExistente?: ExamenExistente): PreguntaForm[] {
@@ -307,6 +308,24 @@ export default function FormularioCrearExamen({
             Permitir 2 intentos (cuenta el más reciente)
           </label>
         )}
+
+        <label className="flex flex-col gap-1 text-sm text-ink/80">
+          Límite de tiempo en minutos (opcional)
+          <input
+            type="number"
+            name="limite_minutos"
+            min={1}
+            max={600}
+            step={1}
+            placeholder="Sin límite"
+            defaultValue={examenExistente?.limiteMinutos ?? undefined}
+            className="input w-32"
+          />
+          <span className="text-xs text-ink/70">
+            Corre desde que cada estudiante presiona &quot;Comenzar&quot;; al acabarse se
+            entrega solo con lo que haya contestado.
+          </span>
+        </label>
 
         <label className="flex items-start gap-2 text-sm text-ink/80">
           <input

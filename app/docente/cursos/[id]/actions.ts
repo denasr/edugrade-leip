@@ -368,6 +368,11 @@ export async function crearExamen(
   // se queda en 1 (el default de la columna), igual que una tarea normal.
   const intentosPermitidos = formData.get("dos_intentos") === "on" ? 2 : 1;
   const ordenAleatorio = formData.get("orden_aleatorio") === "on";
+  const textoLimite = String(formData.get("limite_minutos") ?? "").trim();
+  const limiteMinutos = textoLimite === "" ? null : Number(textoLimite);
+  if (limiteMinutos !== null && (!Number.isInteger(limiteMinutos) || limiteMinutos < 1 || limiteMinutos > 600)) {
+    return { error: "El límite de tiempo debe ser un número entero de minutos, de 1 a 600." };
+  }
 
   if (!titulo || !fechaCierre) {
     return {
@@ -397,6 +402,7 @@ export async function crearExamen(
       fecha_cierre: fechaCierre,
       intentos_permitidos: intentosPermitidos,
       orden_aleatorio: ordenAleatorio,
+      limite_minutos: limiteMinutos,
     })
     .select("id")
     .single();
@@ -474,6 +480,11 @@ export async function editarExamen(
   // este campo, así que editar un cuestionario siempre lo deja en 1.
   const intentosPermitidos = formData.get("dos_intentos") === "on" ? 2 : 1;
   const ordenAleatorio = formData.get("orden_aleatorio") === "on";
+  const textoLimite = String(formData.get("limite_minutos") ?? "").trim();
+  const limiteMinutos = textoLimite === "" ? null : Number(textoLimite);
+  if (limiteMinutos !== null && (!Number.isInteger(limiteMinutos) || limiteMinutos < 1 || limiteMinutos > 600)) {
+    return { error: "El límite de tiempo debe ser un número entero de minutos, de 1 a 600." };
+  }
 
   if (!titulo || !fechaCierre) {
     return {
@@ -501,6 +512,7 @@ export async function editarExamen(
       fecha_cierre: fechaCierre,
       intentos_permitidos: intentosPermitidos,
       orden_aleatorio: ordenAleatorio,
+      limite_minutos: limiteMinutos,
     })
     .eq("id", actividadId);
 
@@ -615,7 +627,7 @@ export async function copiarActividad(
   const { data: actividadOrigen } = (await supabase
     .from("actividades")
     .select(
-      "id, titulo, tipo, instrucciones, intentos_permitidos, orden_aleatorio, cursos(docente_id)"
+      "id, titulo, tipo, instrucciones, intentos_permitidos, orden_aleatorio, limite_minutos, cursos(docente_id)"
     )
     .eq("id", actividadId)
     .single()) as {
@@ -957,7 +969,7 @@ export async function duplicarCurso(
   const { data: actividades } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, tipo, instrucciones, intentos_permitidos, orden_aleatorio, fecha_apertura, fecha_cierre"
+      "id, titulo, tipo, instrucciones, intentos_permitidos, orden_aleatorio, limite_minutos, fecha_apertura, fecha_cierre"
     )
     .eq("curso_id", cursoOrigenId)
     .order("created_at", { ascending: true });

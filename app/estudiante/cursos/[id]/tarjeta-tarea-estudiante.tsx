@@ -12,6 +12,7 @@ import { IconoArchivo } from "@/lib/icono-archivo";
 import AvisoPorVencer from "../../aviso-por-vencer";
 import FormularioEntrega from "./formulario-entrega";
 import TarjetaExamenEstudiante from "./tarjeta-examen-estudiante";
+import type { IntentoActivo } from "@/lib/intentos-examen";
 
 type Entrega = {
   id: string;
@@ -42,6 +43,9 @@ type Actividad = {
   // de un archivo — se detecta por traer preguntas, no por un campo aparte.
   esCuestionario: boolean;
   preguntas: PreguntaCuestionario[];
+  limite_minutos: number | null;
+  intentoActivo: IntentoActivo | null;
+  ahoraServidor: string;
 };
 
 export default function TarjetaTareaEstudiante({
@@ -92,6 +96,9 @@ export default function TarjetaTareaEstudiante({
             ? { id: actividad.entrega.id, evaluaciones: actividad.entrega.evaluaciones }
             : null,
           preguntas: actividad.preguntas,
+          limiteMinutos: actividad.limite_minutos,
+          intentoActivo: actividad.intentoActivo,
+          ahoraServidor: actividad.ahoraServidor,
         }}
         cursoId={cursoId}
       />
