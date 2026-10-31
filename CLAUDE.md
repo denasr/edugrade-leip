@@ -106,8 +106,8 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
 - **Libro de calificaciones del docente.** `/docente/cursos/[id]/calificaciones`, enlazada
   desde `/docente/cursos/[id]`. Una fila por estudiante inscrito, una columna por tarea
   (nota, "Sin calificar" si hay entrega sin evaluar, "Sin entregar" si no hay entrega), una
-  columna por examen ("No presentado" si no hay entrega — un examen entregado siempre trae
-  evaluación porque se autocalifica al momento), % de asistencia y la calificación final
+  columna por examen ("No presentado" si no hay entrega, "Sin calificar" si tiene preguntas
+  abiertas que el docente no ha calificado), % de asistencia y la calificación final
   resaltada, calculados con las mismas funciones de `lib/calificacion-final.ts` que usa la
   vista del estudiante (no hay una segunda fórmula). El % de asistencia se calcula por
   estudiante desde su propia fecha de inscripción, igual que en su vista individual; a
@@ -319,6 +319,37 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `FormularioCrearExamen` envía con `onSubmit` + `startTransition` en vez de
   `action={formAction}`: con `action`, React vaciaba título, fechas y casillas tras
   cualquier error de validación.
+- **Preguntas abiertas (exámenes y cuestionarios).** Migración `20261101140000`:
+  - `preguntas_examen.tipo` (`OPCION_MULTIPLE` | `ABIERTA`). En una abierta, `opciones`
+    queda en `[]` y `correcta` en `''`.
+  - `respuestas_examen.puntos_otorgados`. El texto escrito va en
+    `respuesta_seleccionada`.
+  - La vista `preguntas_examen_estudiante` expone `tipo`, nunca `correcta`.
+
+  Una sola fórmula de nota en `lib/calificar-examen.ts` (`calificarExamen`):
+  - opción múltiple: todos los puntos si la respuesta coincide con `correcta`;
+  - abierta: lo que dio el docente, y 0 si quedó en blanco;
+  - la nota es `null` mientras quede alguna abierta contestada sin calificar.
+
+  Flujo:
+  - `presentarExamen` guarda las respuestas. Si la nota sale `null`, **no** crea
+    evaluación: la entrega queda `PENDIENTE` y el estudiante ve "Enviado, pendiente de
+    calificar".
+  - El docente califica en `/docente/actividades/[id]/respuestas` (enlace "Calificar
+    respuestas escritas" en la tarjeta del examen o cuestionario, con su conteo). Asigna
+    de 0 a los puntos de cada abierta, más retroalimentación.
+  - `calificarRespuestasAbiertas` verifica con RLS que la entrega es suya y escribe
+    `puntos_otorgados` con la secret key, porque `respuestas_examen` no tiene policy de
+    update. Después hace upsert de la evaluación (`origen: MANUAL`) con el cliente
+    normal. Se puede volver a calificar.
+  - La revisión del estudiante ("Ver mis respuestas") muestra su texto y los puntos.
+
+  Con esto un examen entregado **ya puede no tener evaluación**:
+  - el libro de calificaciones muestra "Sin calificar";
+  - el PDF muestra "Presentado, sin calificar";
+  - `contarPendientesCurso` (antes `contarPendientesTareas`) cuenta pendientes de tareas
+    y de exámenes por separado, y la franja de pestañas muestra el número también en
+    "Exámenes".
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,

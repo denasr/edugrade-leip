@@ -52,7 +52,8 @@ function textoSituacion(s: SituacionActividad, examen: boolean): string {
     case "CALIFICADA":
       return `${s.calificacion.toFixed(1)}/10`;
     case "SIN_CALIFICAR":
-      return "Entregada, sin calificar";
+      // Un examen solo queda así si tiene preguntas abiertas por calificar.
+      return examen ? "Presentado, sin calificar" : "Entregada, sin calificar";
     case "POR_ENTREGAR":
       return examen ? "Por presentar" : "Por entregar";
     case "NO_ENTREGADA":

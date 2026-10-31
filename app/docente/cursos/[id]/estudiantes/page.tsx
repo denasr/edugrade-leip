@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { contarPendientesTareas } from "@/lib/pendientes-docente";
+import { contarPendientesCurso } from "@/lib/pendientes-docente";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
 import ModalEliminarEstudiante from "../modal-eliminar-estudiante";
@@ -37,7 +37,7 @@ export default async function EstudiantesCurso({
 
   if (!curso) redirect("/docente");
 
-  const pendientesTareas = await contarPendientesTareas(supabase, id);
+  const pendientes = await contarPendientesCurso(supabase, id);
 
   // Mismo patrón de dos consultas que ya usa la toma de asistencia:
   // inscripciones no tiene FK directa a perfiles (ambas apuntan a
@@ -86,7 +86,7 @@ export default async function EstudiantesCurso({
       <FranjaPestanas
         cursoId={curso.id}
         activa="estudiantes"
-        pendientesTareas={pendientesTareas}
+        pendientes={pendientes}
       />
 
       <section className="w-full max-w-sm">

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { contarPendientesCurso } from "@/lib/pendientes-docente";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
 import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
@@ -149,6 +150,7 @@ export default async function TareasCurso({
   // formulario de edición — mismo patrón que ya usa la pestaña Exámenes.
   type PreguntaConCorrecta = {
     actividad_id: string;
+    tipo: "OPCION_MULTIPLE" | "ABIERTA";
     enunciado: string;
     opciones: string[];
     correcta: string;
@@ -159,7 +161,7 @@ export default async function TareasCurso({
   if (idsCuestionarios.size > 0) {
     const { data: preguntas } = await admin
       .from("preguntas_examen")
-      .select("actividad_id, enunciado, opciones, correcta, puntos")
+      .select("actividad_id, tipo, enunciado, opciones, correcta, puntos")
       .in("actividad_id", Array.from(idsCuestionarios))
       .order("orden", { ascending: true });
 
@@ -170,13 +172,17 @@ export default async function TareasCurso({
     }
   }
 
+  // Las de tareas ya se contaron arriba con más detalle; del helper
+  // compartido solo hace falta el número de la pestaña Exámenes.
+  const { examenes: pendientesExamenes } = await contarPendientesCurso(supabase, id);
+
   return (
     <main className="flex flex-1 flex-col items-center gap-8 px-4 py-16">
       <EncabezadoCurso curso={curso} />
       <FranjaPestanas
         cursoId={curso.id}
         activa="tareas"
-        pendientesTareas={pendientesTareas}
+        pendientes={{ tareas: pendientesTareas, examenes: pendientesExamenes }}
       />
 
       <div className="flex w-full max-w-sm flex-col items-center gap-6">

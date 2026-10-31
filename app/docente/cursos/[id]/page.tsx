@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { contarPendientesTareas } from "@/lib/pendientes-docente";
+import { contarPendientesCurso } from "@/lib/pendientes-docente";
 import EncabezadoCurso from "./encabezado-curso";
 import FranjaPestanas from "./franja-pestanas";
 import FormularioConfiguracion from "./formulario-configuracion";
@@ -39,7 +39,7 @@ export default async function ResumenCurso({
 
   if (!curso) redirect("/docente");
 
-  const pendientesTareas = await contarPendientesTareas(supabase, id);
+  const pendientes = await contarPendientesCurso(supabase, id);
 
   const { count: totalActividades } = await supabase
     .from("actividades")
@@ -62,7 +62,7 @@ export default async function ResumenCurso({
       <FranjaPestanas
         cursoId={curso.id}
         activa="resumen"
-        pendientesTareas={pendientesTareas}
+        pendientes={pendientes}
       />
 
       <FormularioConfiguracion

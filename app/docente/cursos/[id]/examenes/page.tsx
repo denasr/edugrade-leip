@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
-import { contarPendientesTareas } from "@/lib/pendientes-docente";
+import { contarPendientesCurso } from "@/lib/pendientes-docente";
 import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
@@ -48,7 +48,7 @@ export default async function ExamenesCurso({
     .neq("id", id)
     .order("nombre", { ascending: true });
 
-  const [{ data: examenes }, pendientesTareas] = await Promise.all([
+  const [{ data: examenes }, pendientes] = await Promise.all([
     supabase
       .from("actividades")
       .select(
@@ -57,7 +57,7 @@ export default async function ExamenesCurso({
       .eq("curso_id", id)
       .eq("tipo", "EXAMEN")
       .order("created_at", { ascending: false }),
-    contarPendientesTareas(supabase, id),
+    contarPendientesCurso(supabase, id),
   ]);
 
   examenes?.sort(compararPorCierre);
@@ -122,6 +122,7 @@ export default async function ExamenesCurso({
   // curso más arriba, así que es seguro usar la secret key aquí.
   type PreguntaConCorrecta = {
     actividad_id: string;
+    tipo: "OPCION_MULTIPLE" | "ABIERTA";
     enunciado: string;
     opciones: string[];
     correcta: string;
@@ -133,7 +134,7 @@ export default async function ExamenesCurso({
     const admin = createAdminClient();
     const { data: preguntas } = await admin
       .from("preguntas_examen")
-      .select("actividad_id, enunciado, opciones, correcta, puntos")
+      .select("actividad_id, tipo, enunciado, opciones, correcta, puntos")
       .in("actividad_id", examenIds)
       .order("orden", { ascending: true });
 
@@ -150,7 +151,7 @@ export default async function ExamenesCurso({
       <FranjaPestanas
         cursoId={curso.id}
         activa="examenes"
-        pendientesTareas={pendientesTareas}
+        pendientes={pendientes}
       />
 
       <div className="flex w-full max-w-sm flex-col items-center gap-6">

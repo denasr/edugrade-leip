@@ -3,9 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  calificarExamen,
+  LARGO_MAXIMO_RESPUESTA_ABIERTA,
+  type PreguntaParaCalificar,
+} from "@/lib/calificar-examen";
 
 export type EstadoEntrega = { error: string | null };
-export type EstadoExamen = { error: string | null };
+// `pendiente`: se registró, pero tiene preguntas abiertas que el docente
+// todavía tiene que calificar (no hay nota todavía).
+export type EstadoExamen = { error: string | null; pendiente?: boolean };
 
 // Vercel impone su propio límite de payload (~4.5 MB) a las Serverless
 // Functions, por delante y de forma independiente de cualquier
@@ -249,17 +256,25 @@ export async function presentarExamen(
 
     const respuestas: { pregunta_id: string; respuesta_seleccionada: string }[] =
       [];
+    // Mismo nombre de campo para las dos clases de pregunta: en una de
+    // opción múltiple es la opción elegida; en una abierta, el texto que
+    // escribió el estudiante.
     for (const [nombre, valor] of formData.entries()) {
-      if (nombre.startsWith("respuesta-") && typeof valor === "string" && valor) {
+      if (nombre.startsWith("respuesta-") && typeof valor === "string" && valor.trim()) {
         respuestas.push({
           pregunta_id: nombre.slice("respuesta-".length),
-          respuesta_seleccionada: valor,
+          respuesta_seleccionada: valor.trim(),
         });
       }
     }
 
     if (respuestas.length === 0) {
       return { error: "Responde al menos una pregunta." };
+    }
+    if (respuestas.some((r) => r.respuesta_seleccionada.length > LARGO_MAXIMO_RESPUESTA_ABIERTA)) {
+      return {
+        error: `Una respuesta escrita no puede pasar de ${LARGO_MAXIMO_RESPUESTA_ABIERTA} caracteres.`,
+      };
     }
 
     const { data: entrega, error: errorInsert } = await supabase
@@ -309,10 +324,13 @@ export async function presentarExamen(
     // Calificar: preguntas_examen (con `correcta`) solo es legible con la
     // secret key. Este resultado nunca llega al navegador; solo la nota final.
     const admin = createAdminClient();
-    const { data: preguntas, error: errorPreguntas } = await admin
+    const { data: preguntas, error: errorPreguntas } = (await admin
       .from("preguntas_examen")
-      .select("id, correcta, puntos")
-      .eq("actividad_id", actividadId);
+      .select("id, tipo, correcta, puntos")
+      .eq("actividad_id", actividadId)) as {
+      data: PreguntaParaCalificar[] | null;
+      error: unknown;
+    };
 
     if (errorPreguntas || !preguntas || preguntas.length === 0) {
       return {
@@ -321,21 +339,19 @@ export async function presentarExamen(
       };
     }
 
-    const puntosTotales = preguntas.reduce(
-      (suma, p) => suma + Number(p.puntos),
-      0
+    const { nota } = calificarExamen(
+      preguntas,
+      respuestas.map((r) => ({ ...r, puntos_otorgados: null }))
     );
-    const respuestasPorPregunta = new Map(
-      respuestas.map((r) => [r.pregunta_id, r.respuesta_seleccionada])
-    );
-    const puntosObtenidos = preguntas.reduce((suma, p) => {
-      const respuesta = respuestasPorPregunta.get(p.id);
-      return respuesta === p.correcta ? suma + Number(p.puntos) : suma;
-    }, 0);
 
-    const notaSobreDiez =
-      puntosTotales > 0 ? (puntosObtenidos / puntosTotales) * 10 : 0;
-    const calificacionFinal = Math.round(notaSobreDiez * 100) / 100;
+    // Con preguntas abiertas contestadas no hay nota todavía: la entrega
+    // queda PENDIENTE (sin evaluación) hasta que el docente las califica en
+    // /docente/actividades/[id]/respuestas.
+    if (nota === null) {
+      revalidatePath(`/estudiante/cursos/${cursoId}`);
+      return { error: null, pendiente: true };
+    }
+    const calificacionFinal = nota;
 
     const { error: errorEvaluacion } = await admin.from("evaluaciones").insert({
       entrega_id: entrega.id,
@@ -372,9 +388,12 @@ export async function presentarExamen(
 }
 
 export type PreguntaRevisada = {
+  tipo: "OPCION_MULTIPLE" | "ABIERTA";
   enunciado: string;
   opciones: string[];
   correcta: string;
+  // Solo en abiertas: los puntos que dio el docente.
+  puntosOtorgados: number | null;
   seleccionada: string | null;
   puntos: number;
 };
@@ -424,12 +443,10 @@ export async function obtenerRevisionExamen(
     // secret key para esta parte.
     const { data: respuestas } = await supabase
       .from("respuestas_examen")
-      .select("pregunta_id, respuesta_seleccionada")
+      .select("pregunta_id, respuesta_seleccionada, puntos_otorgados")
       .eq("entrega_id", entregaId);
 
-    const respuestaPorPregunta = new Map(
-      (respuestas ?? []).map((r) => [r.pregunta_id, r.respuesta_seleccionada])
-    );
+    const respuestaPorPregunta = new Map((respuestas ?? []).map((r) => [r.pregunta_id, r]));
 
     // Si el docente editó las preguntas después de que el estudiante
     // presentó, el `on delete cascade` de respuestas_examen.pregunta_id se
@@ -448,7 +465,7 @@ export async function obtenerRevisionExamen(
     const admin = createAdminClient();
     const { data: preguntas, error: errorPreguntas } = await admin
       .from("preguntas_examen")
-      .select("id, enunciado, opciones, correcta, puntos")
+      .select("id, tipo, enunciado, opciones, correcta, puntos")
       .eq("actividad_id", entrega.actividad_id)
       .order("orden", { ascending: true });
 
@@ -461,13 +478,21 @@ export async function obtenerRevisionExamen(
 
     return {
       error: null,
-      preguntas: preguntas.map((p) => ({
-        enunciado: p.enunciado,
-        opciones: p.opciones,
-        correcta: p.correcta,
-        seleccionada: respuestaPorPregunta.get(p.id) ?? null,
-        puntos: p.puntos,
-      })),
+      preguntas: preguntas.map((p) => {
+        const respuesta = respuestaPorPregunta.get(p.id);
+        return {
+          tipo: p.tipo,
+          enunciado: p.enunciado,
+          opciones: p.opciones,
+          correcta: p.correcta,
+          seleccionada: respuesta?.respuesta_seleccionada ?? null,
+          puntosOtorgados:
+            respuesta?.puntos_otorgados === null || respuesta?.puntos_otorgados === undefined
+              ? null
+              : Number(respuesta.puntos_otorgados),
+          puntos: p.puntos,
+        };
+      }),
     };
   } catch (err) {
     console.error("Excepción inesperada en obtenerRevisionExamen:", err);

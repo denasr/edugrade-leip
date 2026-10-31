@@ -17,7 +17,13 @@ type Entrega = {
   evaluaciones: { calificacion_final: number; comentarios: string | null } | null;
 };
 
-type Pregunta = { id: string; enunciado: string; opciones: string[]; puntos: number };
+type Pregunta = {
+  id: string;
+  tipo: "OPCION_MULTIPLE" | "ABIERTA";
+  enunciado: string;
+  opciones: string[];
+  puntos: number;
+};
 
 type Examen = {
   id: string;
@@ -51,9 +57,9 @@ export default function TarjetaExamenEstudiante({
   const intentosRestantes = intentosPermitidos - intentosUsados;
   const puedeIntentarDeNuevo = estado === "ABIERTA" && intentosRestantes > 0;
 
-  // Un examen entregado siempre trae evaluación (se autocalifica al
-  // momento), así que a diferencia de la tarea aquí no hay un estado
-  // "Sin calificar" que mostrar en la vista compacta.
+  // Un examen sin preguntas abiertas trae evaluación desde que se entrega;
+  // uno con abiertas queda "pendiente de calificar" hasta que el docente
+  // las califica (ver más abajo).
   const [abierto, setAbierto] = useState(estado !== "CERRADA");
 
   // La revisión (qué contestó vs. cuál era la correcta) se carga solo al
@@ -198,6 +204,16 @@ export default function TarjetaExamenEstudiante({
                       <p className="font-medium text-ink">
                         {i + 1}. {pregunta.enunciado}
                       </p>
+                      {pregunta.tipo === "ABIERTA" ? (
+                        <div className="mt-1 flex flex-col gap-1">
+                          <p className="whitespace-pre-wrap rounded-lg bg-crema px-2 py-1 text-ink/80">
+                            {pregunta.seleccionada ?? "(sin contestar)"}
+                          </p>
+                          <p className="text-xs font-medium text-verde-bosque">
+                            {pregunta.puntosOtorgados ?? 0} de {pregunta.puntos} puntos
+                          </p>
+                        </div>
+                      ) : (
                       <ul className="mt-1 flex flex-col gap-1">
                         {pregunta.opciones.map((opcion, j) => {
                           const esCorrecta = opcion === pregunta.correcta;
@@ -220,13 +236,19 @@ export default function TarjetaExamenEstudiante({
                           );
                         })}
                       </ul>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
             </>
           ) : (
-            <span className="badge-pendiente">Presentado, calificando…</span>
+            <p className="text-ink/70">
+              <span className="badge-pendiente">Enviado, pendiente de calificar</span>
+              <span className="mt-1 block text-xs">
+                Tu docente calificará tus respuestas escritas; aquí verás tu nota.
+              </span>
+            </p>
           )}
         </div>
       )}

@@ -417,6 +417,7 @@ export async function crearExamen(
     .insert(
       preguntasNormalizadas.map((p, i) => ({
         actividad_id: actividad.id,
+        tipo: p.tipo,
         enunciado: p.enunciado,
         opciones: p.opciones,
         correcta: p.correcta,
@@ -515,7 +516,7 @@ export async function editarExamen(
   const admin = createAdminClient();
   const { data: preguntasActuales } = await admin
     .from("preguntas_examen")
-    .select("enunciado, opciones, correcta, puntos")
+    .select("tipo, enunciado, opciones, correcta, puntos")
     .eq("actividad_id", actividadId)
     .order("orden", { ascending: true });
 
@@ -524,6 +525,7 @@ export async function editarExamen(
     (preguntasActuales ?? []).every((actual, i) => {
       const nueva = preguntasNormalizadas[i];
       return (
+        (actual.tipo ?? "OPCION_MULTIPLE") === nueva.tipo &&
         actual.enunciado === nueva.enunciado &&
         actual.correcta === nueva.correcta &&
         actual.puntos === nueva.puntos &&
@@ -546,6 +548,7 @@ export async function editarExamen(
       .insert(
         preguntasNormalizadas.map((p, i) => ({
           actividad_id: actividadId,
+          tipo: p.tipo,
           enunciado: p.enunciado,
           opciones: p.opciones,
           correcta: p.correcta,

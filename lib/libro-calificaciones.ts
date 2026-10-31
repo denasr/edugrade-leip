@@ -236,7 +236,7 @@ export function textoCeldaExamen(celda: CeldaActividad | undefined): string {
   if (!celda || !celda.entregada) return "No presentado";
   return celda.calificacion !== null
     ? `${celda.calificacion.toFixed(1)}/10`
-    : "Calificando…";
+    : "Sin calificar"; // tiene preguntas abiertas que el docente no ha calificado
 }
 
 export function textoAsistencia(

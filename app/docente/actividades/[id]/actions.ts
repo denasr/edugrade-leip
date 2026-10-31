@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { calificarExamen } from "@/lib/calificar-examen";
 
 export type EstadoCalificacion = { error: string | null };
 
@@ -121,4 +123,127 @@ export async function eliminarEntrega(
     console.error("Excepción inesperada en eliminarEntrega:", err);
     return { error: "No se pudo eliminar la entrega. Intenta de nuevo en un momento." };
   }
+}
+
+export type EstadoRespuestasAbiertas = { error: string | null };
+
+// Califica las preguntas abiertas de una entrega de examen o cuestionario:
+// el docente asigna los puntos de cada respuesta escrita (de 0 a los puntos
+// de la pregunta) y con eso sale la nota, junto con lo que ya se había
+// calificado solo de opción múltiple (lib/calificar-examen.ts, la misma
+// fórmula que usa presentarExamen). Se puede volver a calificar.
+//
+// respuestas_examen no tiene policy de update para nadie: se verifica con
+// el cliente normal (RLS) que la entrega es de una actividad de este
+// docente, y solo después se usa la secret key para escribir los puntos.
+export async function calificarRespuestasAbiertas(
+  actividadId: string,
+  entregaId: string,
+  _estadoPrevio: EstadoRespuestasAbiertas,
+  formData: FormData
+): Promise<EstadoRespuestasAbiertas> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  const { data: entrega } = (await supabase
+    .from("entregas")
+    .select("id, actividad_id, actividades(cursos(docente_id))")
+    .eq("id", entregaId)
+    .eq("actividad_id", actividadId)
+    .maybeSingle()) as {
+    data: {
+      id: string;
+      actividad_id: string;
+      actividades: { cursos: { docente_id: string } | null } | null;
+    } | null;
+  };
+
+  if (!entrega || entrega.actividades?.cursos?.docente_id !== user.id) {
+    return { error: "No tienes permiso sobre esta entrega." };
+  }
+
+  const admin = createAdminClient();
+  const [{ data: preguntas }, { data: respuestas }] = await Promise.all([
+    admin
+      .from("preguntas_examen")
+      .select("id, tipo, correcta, puntos")
+      .eq("actividad_id", actividadId),
+    admin
+      .from("respuestas_examen")
+      .select("id, pregunta_id, respuesta_seleccionada, puntos_otorgados")
+      .eq("entrega_id", entregaId),
+  ]);
+
+  if (!preguntas || !respuestas) {
+    return { error: "No se pudieron leer las respuestas. Intenta de nuevo." };
+  }
+
+  // Solo se califican las abiertas que sí contestó; una en blanco vale 0
+  // sin que el docente tenga que hacer nada.
+  const respuestaPorPregunta = new Map(respuestas.map((r) => [r.pregunta_id, r]));
+  const actualizaciones: { id: string; puntos: number }[] = [];
+  for (const pregunta of preguntas) {
+    if (pregunta.tipo !== "ABIERTA") continue;
+    const respuesta = respuestaPorPregunta.get(pregunta.id);
+    if (!respuesta?.respuesta_seleccionada?.trim()) continue;
+
+    const texto = String(formData.get(`puntos-${pregunta.id}`) ?? "").trim();
+    const puntos = Number(texto);
+    const maximo = Number(pregunta.puntos);
+    if (texto === "" || !Number.isFinite(puntos) || puntos < 0 || puntos > maximo) {
+      return { error: `Asigna a cada respuesta escrita entre 0 y sus puntos (máximo ${maximo}).` };
+    }
+    actualizaciones.push({ id: respuesta.id, puntos });
+  }
+
+  for (const { id, puntos } of actualizaciones) {
+    const { error } = await admin
+      .from("respuestas_examen")
+      .update({ puntos_otorgados: puntos })
+      .eq("id", id)
+      .eq("entrega_id", entregaId);
+    if (error) {
+      console.error("Error al guardar puntos de respuesta abierta:", error);
+      return { error: "No se pudieron guardar los puntos. Intenta de nuevo." };
+    }
+  }
+
+  const puntosPorRespuesta = new Map(actualizaciones.map((a) => [a.id, a.puntos]));
+  const { nota } = calificarExamen(
+    preguntas,
+    respuestas.map((r) => ({
+      ...r,
+      puntos_otorgados: puntosPorRespuesta.get(r.id) ?? r.puntos_otorgados,
+    }))
+  );
+  if (nota === null) {
+    return { error: "Falta calificar alguna respuesta escrita." };
+  }
+
+  const comentarios = String(formData.get("retroalimentacion") ?? "").trim();
+  // RLS (evaluaciones del docente) permite este upsert con el cliente normal,
+  // igual que calificarEntrega. El trigger marca la entrega como CALIFICADO.
+  const { error: errorEvaluacion } = await supabase.from("evaluaciones").upsert(
+    {
+      entrega_id: entregaId,
+      calificacion_final: nota,
+      comentarios: comentarios || null,
+      origen: "MANUAL",
+    },
+    { onConflict: "entrega_id" }
+  );
+
+  if (errorEvaluacion) {
+    return { error: errorEvaluacion.message };
+  }
+
+  revalidatePath(`/docente/actividades/${actividadId}`, "layout");
+  revalidatePath("/docente/cursos", "layout");
+  return { error: null };
 }

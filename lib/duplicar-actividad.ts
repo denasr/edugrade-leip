@@ -56,7 +56,7 @@ export async function duplicarActividad(
   const admin = createAdminClient();
   const { data: preguntas } = await admin
     .from("preguntas_examen")
-    .select("enunciado, opciones, correcta, puntos, orden")
+    .select("tipo, enunciado, opciones, correcta, puntos, orden")
     .eq("actividad_id", origen.id)
     .order("orden", { ascending: true });
 

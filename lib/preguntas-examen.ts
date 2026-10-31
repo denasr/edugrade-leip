@@ -1,5 +1,7 @@
-// Reglas de las preguntas de opción múltiple de un examen o cuestionario,
-// compartidas por crearExamen y editarExamen (que antes las repetían).
+import type { TipoPregunta } from "@/lib/calificar-examen";
+
+// Reglas de las preguntas de un examen o cuestionario, compartidas por
+// crearExamen y editarExamen (que antes las repetían).
 
 export const MINIMO_OPCIONES = 2;
 export const MAXIMO_OPCIONES = 6;
@@ -18,6 +20,7 @@ export function esVerdaderoFalso(opciones: string[]): boolean {
 }
 
 export type PreguntaValidada = {
+  tipo: TipoPregunta;
   enunciado: string;
   opciones: string[];
   correcta: string;
@@ -27,6 +30,8 @@ export type PreguntaValidada = {
 // Normaliza (trim) y valida lo que manda el formulario. La respuesta
 // correcta se guarda y se compara por su texto, así que dos opciones
 // iguales en la misma pregunta harían ambigua la calificación: se rechazan.
+// Una pregunta abierta solo lleva enunciado y puntos; sus opciones quedan
+// vacías y su correcta en "" (las columnas no admiten null).
 export function validarPreguntas(
   entrada: unknown
 ): { preguntas: PreguntaValidada[] } | { error: string } {
@@ -34,20 +39,29 @@ export function validarPreguntas(
     return { error: "Agrega al menos una pregunta." };
   }
 
-  const preguntas: PreguntaValidada[] = entrada.map((p) => ({
-    enunciado: String(p?.enunciado ?? "").trim(),
-    opciones: (Array.isArray(p?.opciones) ? p.opciones : []).map((o: unknown) =>
-      String(o).trim()
-    ),
-    correcta: String(p?.correcta ?? "").trim(),
-    puntos: Number(p?.puntos),
-  }));
+  const preguntas: PreguntaValidada[] = entrada.map((p) => {
+    const tipo: TipoPregunta = p?.tipo === "ABIERTA" ? "ABIERTA" : "OPCION_MULTIPLE";
+    return {
+      tipo,
+      enunciado: String(p?.enunciado ?? "").trim(),
+      opciones:
+        tipo === "ABIERTA"
+          ? []
+          : (Array.isArray(p?.opciones) ? p.opciones : []).map((o: unknown) => String(o).trim()),
+      correcta: tipo === "ABIERTA" ? "" : String(p?.correcta ?? "").trim(),
+      puntos: Number(p?.puntos),
+    };
+  });
 
   for (const [i, p] of preguntas.entries()) {
     const n = i + 1;
     if (!p.enunciado) {
       return { error: `La pregunta ${n} necesita un enunciado.` };
     }
+    if (!Number.isFinite(p.puntos) || p.puntos <= 0) {
+      return { error: `La pregunta ${n} necesita puntos mayores a 0.` };
+    }
+    if (p.tipo === "ABIERTA") continue;
     if (p.opciones.length < MINIMO_OPCIONES || p.opciones.length > MAXIMO_OPCIONES) {
       return {
         error: `La pregunta ${n} necesita entre ${MINIMO_OPCIONES} y ${MAXIMO_OPCIONES} opciones.`,
@@ -61,9 +75,6 @@ export function validarPreguntas(
     }
     if (!p.opciones.includes(p.correcta)) {
       return { error: `La pregunta ${n} necesita marcar cuál opción es correcta.` };
-    }
-    if (!Number.isFinite(p.puntos) || p.puntos <= 0) {
-      return { error: `La pregunta ${n} necesita puntos mayores a 0.` };
     }
   }
 

@@ -12,22 +12,33 @@ import {
 } from "@/lib/preguntas-examen";
 import { useToast } from "../../../toast-provider";
 
+// Cómo se ve la pregunta en el formulario. En la base de datos solo hay
+// OPCION_MULTIPLE y ABIERTA: Verdadero/Falso es una de opción múltiple con
+// OPCIONES_VERDADERO_FALSO (ver lib/preguntas-examen.ts).
+type TipoFormulario = "OPCION_MULTIPLE" | "VERDADERO_FALSO" | "ABIERTA";
+
+const TIPOS_FORMULARIO: { valor: TipoFormulario; etiqueta: string }[] = [
+  { valor: "OPCION_MULTIPLE", etiqueta: "Opción múltiple" },
+  { valor: "VERDADERO_FALSO", etiqueta: "Verdadero/Falso" },
+  { valor: "ABIERTA", etiqueta: "Abierta" },
+];
+
 type PreguntaForm = {
   enunciado: string;
-  // Verdadero/Falso: las opciones son siempre OPCIONES_VERDADERO_FALSO y no
-  // se editan; las de opción múltiple se conservan aparte por si el docente
-  // vuelve a cambiar el tipo sin querer perder lo que ya escribió.
-  verdaderoFalso: boolean;
+  tipo: TipoFormulario;
+  // Solo las usa OPCION_MULTIPLE; se conservan al cambiar de tipo para no
+  // perder lo que el docente ya escribió si se regresa.
   opciones: string[];
   correcta: number;
   puntos: number;
 };
 
 function preguntaVacia(): PreguntaForm {
-  return { enunciado: "", verdaderoFalso: false, opciones: ["", "", "", ""], correcta: 0, puntos: 5 };
+  return { enunciado: "", tipo: "OPCION_MULTIPLE", opciones: ["", "", "", ""], correcta: 0, puntos: 5 };
 }
 
 type PreguntaExistente = {
+  tipo?: "OPCION_MULTIPLE" | "ABIERTA";
   enunciado: string;
   opciones: string[];
   correcta: string;
@@ -50,11 +61,16 @@ function preguntasIniciales(examenExistente?: ExamenExistente): PreguntaForm[] {
     return [preguntaVacia()];
   }
   return examenExistente.preguntas.map((p) => {
-    const verdaderoFalso = esVerdaderoFalso(p.opciones);
+    const tipo: TipoFormulario =
+      p.tipo === "ABIERTA"
+        ? "ABIERTA"
+        : esVerdaderoFalso(p.opciones)
+          ? "VERDADERO_FALSO"
+          : "OPCION_MULTIPLE";
     return {
       enunciado: p.enunciado,
-      verdaderoFalso,
-      opciones: verdaderoFalso ? ["", "", "", ""] : [...p.opciones],
+      tipo,
+      opciones: tipo === "OPCION_MULTIPLE" ? [...p.opciones] : ["", "", "", ""],
       correcta: Math.max(0, p.opciones.indexOf(p.correcta)),
       puntos: p.puntos,
     };
@@ -156,10 +172,10 @@ export default function FormularioCrearExamen({
     );
   }
 
-  function cambiarTipoPregunta(indice: number, verdaderoFalso: boolean) {
+  function cambiarTipoPregunta(indice: number, tipo: TipoFormulario) {
     // correcta vuelve a 0 porque las posiciones de un tipo no corresponden
     // a las del otro.
-    actualizarPregunta(indice, { verdaderoFalso, correcta: 0 });
+    actualizarPregunta(indice, { tipo, correcta: 0 });
   }
 
   function agregarPregunta() {
@@ -180,8 +196,12 @@ export default function FormularioCrearExamen({
 
   const preguntasJson = JSON.stringify(
     preguntas.map((p) => {
-      const opciones = p.verdaderoFalso ? OPCIONES_VERDADERO_FALSO : p.opciones;
+      if (p.tipo === "ABIERTA") {
+        return { tipo: "ABIERTA", enunciado: p.enunciado, puntos: p.puntos };
+      }
+      const opciones = p.tipo === "VERDADERO_FALSO" ? OPCIONES_VERDADERO_FALSO : p.opciones;
       return {
+        tipo: "OPCION_MULTIPLE",
         enunciado: p.enunciado,
         opciones,
         correcta: opciones[p.correcta],
@@ -340,19 +360,16 @@ export default function FormularioCrearExamen({
               <div
                 role="group"
                 aria-label={`Tipo de la pregunta ${indice + 1}`}
-                className="flex gap-1 text-xs"
+                className="flex flex-wrap gap-1 text-xs"
               >
-                {[
-                  { valor: false, etiqueta: "Opción múltiple" },
-                  { valor: true, etiqueta: "Verdadero/Falso" },
-                ].map((tipoPregunta) => (
+                {TIPOS_FORMULARIO.map((tipoPregunta) => (
                   <button
-                    key={tipoPregunta.etiqueta}
+                    key={tipoPregunta.valor}
                     type="button"
-                    aria-pressed={pregunta.verdaderoFalso === tipoPregunta.valor}
+                    aria-pressed={pregunta.tipo === tipoPregunta.valor}
                     onClick={() => cambiarTipoPregunta(indice, tipoPregunta.valor)}
                     className={`rounded-full border px-3 py-1.5 font-medium transition-colors ${
-                      pregunta.verdaderoFalso === tipoPregunta.valor
+                      pregunta.tipo === tipoPregunta.valor
                         ? "border-verde-bosque bg-verde-bosque text-crema"
                         : "border-verde-bosque/30 text-verde-bosque hover:bg-verde-bosque/10"
                     }`}
@@ -362,7 +379,13 @@ export default function FormularioCrearExamen({
                 ))}
               </div>
 
-              {pregunta.verdaderoFalso
+              {pregunta.tipo === "ABIERTA" ? (
+                <p className="rounded-lg bg-white/60 p-2 text-xs text-ink/70">
+                  El estudiante escribe su respuesta y tú la calificas a mano (de 0
+                  a los puntos de la pregunta). El examen queda pendiente hasta
+                  que la califiques; las de opción múltiple se califican solas.
+                </p>
+              ) : pregunta.tipo === "VERDADERO_FALSO"
                 ? OPCIONES_VERDADERO_FALSO.map((opcion, opcionIndice) => (
                     <label
                       key={opcion}
@@ -409,7 +432,7 @@ export default function FormularioCrearExamen({
                     </div>
                   ))}
 
-              {!pregunta.verdaderoFalso && pregunta.opciones.length < MAXIMO_OPCIONES && (
+              {pregunta.tipo === "OPCION_MULTIPLE" && pregunta.opciones.length < MAXIMO_OPCIONES && (
                 <button
                   type="button"
                   onClick={() => agregarOpcion(indice)}
@@ -418,9 +441,11 @@ export default function FormularioCrearExamen({
                   + Agregar opción
                 </button>
               )}
-              <span className="text-xs text-ink/70">
-                Marca con el círculo cuál es la respuesta correcta.
-              </span>
+              {pregunta.tipo !== "ABIERTA" && (
+                <span className="text-xs text-ink/70">
+                  Marca con el círculo cuál es la respuesta correcta.
+                </span>
+              )}
 
               <label className="flex items-center gap-2 text-sm text-ink/80">
                 Puntos

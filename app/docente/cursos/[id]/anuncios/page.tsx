@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { contarPendientesTareas } from "@/lib/pendientes-docente";
+import { contarPendientesCurso } from "@/lib/pendientes-docente";
 import { COLUMNAS_ANUNCIO, type Anuncio } from "@/lib/anuncios";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
@@ -37,7 +37,7 @@ export default async function AnunciosCurso({
 
   if (!curso) redirect("/docente");
 
-  const pendientesTareas = await contarPendientesTareas(supabase, id);
+  const pendientes = await contarPendientesCurso(supabase, id);
 
   // Fijados primero, después del más nuevo al más viejo — mismo orden que
   // ve el estudiante en la página del curso.
@@ -54,7 +54,7 @@ export default async function AnunciosCurso({
       <FranjaPestanas
         cursoId={curso.id}
         activa="anuncios"
-        pendientesTareas={pendientesTareas}
+        pendientes={pendientes}
       />
 
       <section className="flex w-full max-w-sm flex-col gap-4">

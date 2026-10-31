@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { estadoActividad, textoRelativoCierre } from "@/lib/actividades";
 import FormularioCrearExamen from "./formulario-crear-examen";
@@ -25,6 +26,7 @@ type Examen = {
 };
 
 type Pregunta = {
+  tipo: "OPCION_MULTIPLE" | "ABIERTA";
   enunciado: string;
   opciones: string[];
   correcta: string;
@@ -57,8 +59,6 @@ export default function TarjetaExamen({
   const [editando, setEditando] = useState(false);
   const [copiando, setCopiando] = useState(false);
   // Mismo patrón que TarjetaTarea: colapsada por default solo si ya cerró.
-  // Sin badge de pendientes aquí — un examen se autocalifica al momento de
-  // entregarse, no existe un estado "sin calificar" que señalar.
   const [abierto, setAbierto] = useState(estado !== "CERRADA");
 
   if (editando) {
@@ -100,6 +100,10 @@ export default function TarjetaExamen({
 
   const promedio =
     stats.conCalif > 0 ? (stats.sumaCalif / stats.conCalif).toFixed(1) : "—";
+  // Solo con preguntas abiertas hay entregas que esperan al docente; las
+  // demás se califican solas al entregarse.
+  const tieneAbiertas = preguntas.some((p) => p.tipo === "ABIERTA");
+  const porCalificar = stats.presentados - stats.conCalif;
   const alternarBloqueoAction = alternarBloqueo.bind(
     null,
     cursoId,
@@ -179,6 +183,20 @@ export default function TarjetaExamen({
       <p className="mt-1 text-xs text-ink/70">
         {stats.presentados} presentados · promedio {promedio}/10
       </p>
+
+      {tieneAbiertas && (
+        <Link
+          href={`/docente/actividades/${examen.id}/respuestas`}
+          className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-verde-bosque hover:underline"
+        >
+          Calificar respuestas escritas
+          {porCalificar > 0 && (
+            <span className="badge-pendiente">
+              {porCalificar} {porCalificar === 1 ? "pendiente" : "pendientes"}
+            </span>
+          )}
+        </Link>
+      )}
 
       {examen.instrucciones && (
         <p className="mt-1 text-sm text-ink/70">{examen.instrucciones}</p>

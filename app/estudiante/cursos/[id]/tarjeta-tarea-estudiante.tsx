@@ -22,6 +22,7 @@ type Entrega = {
 
 type PreguntaCuestionario = {
   id: string;
+  tipo: "OPCION_MULTIPLE" | "ABIERTA";
   enunciado: string;
   opciones: string[];
   puntos: number;

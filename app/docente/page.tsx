@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { contarPendientesTareas } from "@/lib/pendientes-docente";
+import { contarPendientesCurso } from "@/lib/pendientes-docente";
 import FormularioCurso from "./formulario-curso";
 
 export default async function PanelDocente() {
@@ -32,15 +32,17 @@ export default async function PanelDocente() {
   const cursosArchivados = (cursos ?? []).filter((c) => c.archivado_at);
 
   // Mismo conteo que ya usa el badge de la franja de pestañas dentro de
-  // cada curso (contarPendientesTareas, en lib/pendientes-docente.ts)
+  // cada curso (contarPendientesCurso, en lib/pendientes-docente.ts)
   // — aquí se corre para todos los cursos del docente a la vez, para no
   // tener que entrar uno por uno a ver dónde hay entregas sin calificar.
-  const cursosConPendientes = await Promise.all(
-    cursosActivos.map(async (curso) => ({
-      ...curso,
-      pendientes: await contarPendientesTareas(supabase, curso.id),
-    }))
-  );
+  const cursosConPendientes = (
+    await Promise.all(
+      cursosActivos.map(async (curso) => ({
+        ...curso,
+        ...(await contarPendientesCurso(supabase, curso.id)),
+      }))
+    )
+  ).map((curso) => ({ ...curso, pendientes: curso.tareas + curso.examenes }));
   const cursosPendientesOrdenados = cursosConPendientes
     .filter((c) => c.pendientes > 0)
     .sort((a, b) => b.pendientes - a.pendientes);
@@ -78,7 +80,9 @@ export default async function PanelDocente() {
                   key={curso.id}
                   className="card p-4 transition-shadow hover:shadow-md"
                 >
-                  <Link href={`/docente/cursos/${curso.id}/tareas`}>
+                  <Link
+                    href={`/docente/cursos/${curso.id}/${curso.tareas > 0 ? "tareas" : "examenes"}`}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate font-medium text-ink">

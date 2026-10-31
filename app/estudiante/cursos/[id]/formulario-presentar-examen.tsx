@@ -2,10 +2,12 @@
 
 import { useActionState, useRef, useState } from "react";
 import { presentarExamen, type EstadoExamen } from "./actions";
+import { LARGO_MAXIMO_RESPUESTA_ABIERTA } from "@/lib/calificar-examen";
 import { useToast } from "../../../toast-provider";
 
 type Pregunta = {
   id: string;
+  tipo: "OPCION_MULTIPLE" | "ABIERTA";
   enunciado: string;
   opciones: string[];
   puntos: number;
@@ -54,6 +56,12 @@ export default function FormularioPresentarExamen({
   }
 
   function alTocarInicio(e: React.TouchEvent) {
+    // Dentro del cuadro de una respuesta abierta, deslizar es seleccionar o
+    // mover el cursor en el texto, no cambiar de pregunta.
+    if ((e.target as HTMLElement).tagName === "TEXTAREA") {
+      inicioToque.current = null;
+      return;
+    }
     const t = e.touches[0];
     inicioToque.current = { x: t.clientX, y: t.clientY };
   }
@@ -87,7 +95,7 @@ export default function FormularioPresentarExamen({
     // roto). En su lugar se valida aquí contra el estado controlado (no
     // contra formData): si falta alguna, se salta directo a la primera sin
     // responder en vez de llamar al servidor.
-    const faltante = preguntas.findIndex((p) => !respuestas[p.id]);
+    const faltante = preguntas.findIndex((p) => !respuestas[p.id]?.trim());
     if (faltante !== -1) {
       irA(faltante);
       return { error: `Responde la pregunta ${faltante + 1} antes de enviar.` };
@@ -100,7 +108,11 @@ export default function FormularioPresentarExamen({
       formData
     );
     if (!resultado.error) {
-      mostrar("Examen enviado.");
+      mostrar(
+        resultado.pendiente
+          ? "Examen enviado. Tu docente calificará tus respuestas escritas."
+          : "Examen enviado."
+      );
     }
     return resultado;
   }
@@ -123,7 +135,8 @@ export default function FormularioPresentarExamen({
           Pregunta {indice + 1} de {preguntas.length}
         </span>
         <span>
-          {Object.keys(respuestas).length} de {preguntas.length} respondidas
+          {preguntas.filter((p) => respuestas[p.id]?.trim()).length} de {preguntas.length}{" "}
+          respondidas
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-verde-bosque/10">
@@ -143,6 +156,18 @@ export default function FormularioPresentarExamen({
             <legend className="text-sm text-ink/80">
               {i + 1}. {pregunta.enunciado}
             </legend>
+            {pregunta.tipo === "ABIERTA" && (
+              <textarea
+                name={`respuesta-${pregunta.id}`}
+                aria-label={`Tu respuesta a la pregunta ${i + 1}`}
+                rows={5}
+                maxLength={LARGO_MAXIMO_RESPUESTA_ABIERTA}
+                value={respuestas[pregunta.id] ?? ""}
+                onChange={(e) => marcarRespuesta(pregunta.id, e.target.value)}
+                placeholder="Escribe tu respuesta"
+                className="input mt-1 text-sm"
+              />
+            )}
             {pregunta.opciones.map((opcion, opcionIndice) => (
               <label
                 key={opcionIndice}

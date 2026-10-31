@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { PendientesCurso } from "@/lib/pendientes-docente";
 
 type IdPestana =
   | "resumen"
@@ -24,11 +25,11 @@ const PESTANAS: { id: IdPestana; etiqueta: string; sufijo: string }[] = [
 export default function FranjaPestanas({
   cursoId,
   activa,
-  pendientesTareas,
+  pendientes,
 }: {
   cursoId: string;
   activa: IdPestana;
-  pendientesTareas: number;
+  pendientes: PendientesCurso;
 }) {
   return (
     <nav
@@ -51,11 +52,19 @@ export default function FranjaPestanas({
             }`}
           >
             {pestana.etiqueta}
-            {pestana.id === "tareas" && pendientesTareas > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-terracota px-1 text-[10px] font-bold text-crema">
-                {pendientesTareas}
-              </span>
-            )}
+            {(() => {
+              const numero =
+                pestana.id === "tareas"
+                  ? pendientes.tareas
+                  : pestana.id === "examenes"
+                    ? pendientes.examenes
+                    : 0;
+              return numero > 0 ? (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-terracota px-1 text-[10px] font-bold text-crema">
+                  {numero}
+                </span>
+              ) : null;
+            })()}
           </Link>
         );
       })}

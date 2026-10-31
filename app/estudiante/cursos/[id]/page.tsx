@@ -47,6 +47,7 @@ export default async function DetalleCursoEstudiante({
 
   type PreguntaEstudiante = {
     id: string;
+    tipo: "OPCION_MULTIPLE" | "ABIERTA";
     enunciado: string;
     opciones: string[];
     puntos: number;
@@ -60,7 +61,7 @@ export default async function DetalleCursoEstudiante({
       if (actividad.esCuestionario && !actividad.entrega && estado === "ABIERTA") {
         const { data } = await supabase
           .from("preguntas_examen_estudiante")
-          .select("id, enunciado, opciones, puntos")
+          .select("id, tipo, enunciado, opciones, puntos")
           .eq("actividad_id", actividad.id)
           .order("orden", { ascending: true });
         preguntas = (data ?? []) as PreguntaEstudiante[];
@@ -108,7 +109,7 @@ export default async function DetalleCursoEstudiante({
       if (intentosRestantes > 0 && estadoActividad(examen) === "ABIERTA") {
         const { data } = await supabase
           .from("preguntas_examen_estudiante")
-          .select("id, enunciado, opciones, puntos")
+          .select("id, tipo, enunciado, opciones, puntos")
           .eq("actividad_id", examen.id)
           .order("orden", { ascending: true });
         preguntas = (data ?? []) as PreguntaEstudiante[];
