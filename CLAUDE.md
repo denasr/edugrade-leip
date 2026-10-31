@@ -273,6 +273,32 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   Enlaces firmados de 30 min (la lista sigue con 10). `calificarEntrega` revalida con
   `"layout"` para que también se actualice el conteo del modo revisión. La prueba e2e usa
   `tests/e2e/fixtures/prueba.docx`, generado con `jszip`.
+- **Archivar cursos.** Columna `cursos.archivado_at` (migración `20261101120000`; `null` =
+  activo). Es solo organización del docente:
+  - el curso sale de "Mis cursos" y de "Por calificar" en `/docente` y pasa a una sección
+    plegada "Cursos archivados" (`<details>`);
+  - sigue completo y editable;
+  - se archiva y desarchiva con un botón en el Resumen del curso
+    (`cambiarArchivadoCurso`).
+
+  Por decisión del docente, a los estudiantes no se les cambia nada: él los elimina del
+  curso al terminar. Lo único que sí cambia es que `inscribirse_a_curso` rechaza
+  inscripciones nuevas a un curso archivado ("Este curso ya terminó y no admite
+  inscripciones").
+- **Duplicar curso.** Botón en el Resumen del curso (`duplicarCurso`). Crea un curso nuevo
+  con nombre, grupo, periodo y clave nuevos, más:
+  - la misma ponderación;
+  - todas las actividades en orden de creación, con sus preguntas y su material (copiado
+    dentro de Storage).
+
+  Las actividades se copian **ocultas y con sus fechas originales**: por decisión del
+  docente, él ajusta la fecha de cada una al publicarla; no se recorren automáticamente.
+  No copia estudiantes, entregas, asistencia ni anuncios. Es todo o nada: si una
+  actividad falla, se borran el curso nuevo y los archivos ya copiados. Al terminar lleva
+  a la pestaña Tareas del curso nuevo. La copia de cada actividad vive en
+  `lib/duplicar-actividad.ts` (`duplicarActividad`), compartida con "Copiar a otro curso"
+  (`copiarActividad`). La clave de acceso se genera con `lib/clave-acceso.ts`,
+  compartido con `FormularioCurso`.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
@@ -333,6 +359,7 @@ create table cursos (
   porcentaje_tareas integer not null default 40,
   porcentaje_examenes integer not null default 50,
   porcentaje_asistencia integer not null default 10,
+  archivado_at timestamptz, -- null = activo (migración 20261101120000)
   created_at timestamptz default now()
 );
 

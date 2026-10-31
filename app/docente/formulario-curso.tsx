@@ -3,16 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { crearCurso, type EstadoCrearCurso } from "./actions";
 import { useToast } from "../toast-provider";
-
-function generarClaveAcceso() {
-  // sin 0/O ni 1/I/L, para que no se confundan al copiarla a mano
-  const alfabeto = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  let clave = "";
-  for (let i = 0; i < 6; i++) {
-    clave += alfabeto[Math.floor(Math.random() * alfabeto.length)];
-  }
-  return clave;
-}
+import { generarClaveAcceso } from "@/lib/clave-acceso";
 
 const estadoInicial: EstadoCrearCurso = { error: null };
 
