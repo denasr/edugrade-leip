@@ -8,10 +8,10 @@ import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 export type EstadoActividad = { error: string | null };
 export type EstadoConfiguracion = { error: string | null };
 
-// Ya no hay una sola pantalla /docente/cursos/[id] con todo junto — son 5
+// Ya no hay una sola pantalla /docente/cursos/[id] con todo junto — son
 // pestañas en rutas separadas (resumen, tareas, examenes, asistencia,
-// estudiantes), cada una mostrando el badge de "pendientes" en la franja
-// que ven las otras 4. Por eso cualquier cambio revalida las 5 juntas en
+// anuncios, estudiantes), cada una mostrando el badge de "pendientes" en la
+// franja que ven las demás. Por eso cualquier cambio revalida todas juntas en
 // vez de solo la ruta donde ocurrió la acción — es la única forma de que
 // ese badge no se quede desactualizado en las pestañas que no se visitaron.
 function revalidarPestanasCurso(cursoId: string) {
@@ -19,6 +19,7 @@ function revalidarPestanasCurso(cursoId: string) {
   revalidatePath(`/docente/cursos/${cursoId}/tareas`);
   revalidatePath(`/docente/cursos/${cursoId}/examenes`);
   revalidatePath(`/docente/cursos/${cursoId}/asistencia`);
+  revalidatePath(`/docente/cursos/${cursoId}/anuncios`);
   revalidatePath(`/docente/cursos/${cursoId}/estudiantes`);
   revalidatePath(`/docente/cursos/${cursoId}/calificaciones`);
 }

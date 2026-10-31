@@ -238,6 +238,20 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   menos de 2 días (`cierraPronto`, que antes era de 1 día). Una tarea entregada a medias
   (sin archivos ni calificación) sí lleva el aviso, igual que en el resto de la app. El
   docente no lo ve.
+- **Tablón de anuncios por curso.** Tabla `anuncios` (migración `20261031120000`): avisos
+  del docente a su grupo, solo de ida (los estudiantes no comentan) y sin adjuntos. El
+  docente los publica, edita, fija y elimina en la pestaña **Anuncios**
+  (`/docente/cursos/[id]/anuncios`). El estudiante los ve arriba de la página de su curso
+  (`TablonAnuncios`: fijados primero, luego del más nuevo al más viejo, 3 visibles y el
+  resto tras "Ver anuncios anteriores"), y los de la última semana de todos sus cursos
+  en "Anuncios recientes" de su panel. "Nuevo" = publicado hace menos de 3 días; no se
+  guarda quién leyó qué. `editado_at` lo escribe solo `editarAnuncio` (no un trigger),
+  para que fijar/desfijar no lo marque como editado. Los enlaces http(s) se vuelven
+  clicables con `lib/texto-con-enlaces.tsx`, que arma elementos de React (nunca HTML
+  crudo). Fechas en hora de `America/Mexico_City` (`fechaAnuncio`), porque también se
+  renderizan en el servidor. RLS: lee el docente dueño o un inscrito
+  (`esta_inscrito_en_curso`), y solo el docente dueño escribe. Con la sexta pestaña, la
+  franja de pestañas va en 2 filas de 3 en celular y en una sola fila desde `sm`.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
@@ -398,6 +412,17 @@ create table asistencias (
   created_at timestamptz default now(),
   updated_at timestamptz default now(), -- trigger la mantiene al día
   unique (sesion_id, estudiante_id)
+);
+
+-- Agregada en 20261031120000_add_anuncios.sql
+create table anuncios (
+  id uuid primary key default gen_random_uuid(),
+  curso_id uuid not null references cursos(id) on delete cascade,
+  autor_id uuid not null references auth.users(id),
+  contenido text not null check (char_length(btrim(contenido)) between 1 and 4000),
+  fijado boolean not null default false,
+  created_at timestamptz not null default now(),
+  editado_at timestamptz -- solo al editar el texto, no al fijar
 );
 ```
 

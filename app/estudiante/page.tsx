@@ -7,6 +7,13 @@ import {
   textoRelativoCierre,
   cierraPronto,
 } from "@/lib/actividades";
+import {
+  esAnuncioNuevo,
+  fechaAnuncio,
+  inicioAnunciosRecientes,
+  COLUMNAS_ANUNCIO,
+  type Anuncio,
+} from "@/lib/anuncios";
 import AvisoPorVencer from "./aviso-por-vencer";
 import FormularioInscripcion from "./formulario-inscripcion";
 
@@ -30,6 +37,11 @@ type ActividadConCurso = {
   curso_id: string;
   cursos: { nombre: string } | null;
 };
+
+type AnuncioConCurso = Anuncio & { cursos: { nombre: string } | null };
+
+// Cuántos anuncios recientes caben en el panel; el resto se ve en cada curso.
+const MAXIMO_ANUNCIOS_PANEL = 5;
 
 export default async function PanelEstudiante() {
   const supabase = await createClient();
@@ -102,6 +114,20 @@ export default async function PanelEstudiante() {
       .map((e) => e.actividad_id)
   );
 
+  // Anuncios de la última semana de todos sus cursos (RLS ya limita a los
+  // cursos donde está inscrito); el tablón completo vive en cada curso.
+  const { data: anunciosRecientes } = (
+    cursoIds.length > 0
+      ? await supabase
+          .from("anuncios")
+          .select(`${COLUMNAS_ANUNCIO}, cursos(nombre)`)
+          .in("curso_id", cursoIds)
+          .gte("created_at", inicioAnunciosRecientes())
+          .order("created_at", { ascending: false })
+          .limit(MAXIMO_ANUNCIOS_PANEL)
+      : { data: [] }
+  ) as { data: AnuncioConCurso[] | null };
+
   const pendientes = (actividadesCrudas ?? [])
     .filter((a) => estadoActividad(a) === "ABIERTA" && !idsConEntrega.has(a.id))
     .sort(compararPorCierre);
@@ -122,6 +148,35 @@ export default async function PanelEstudiante() {
       ) : (
         <>
           <FormularioInscripcion mostrarBotonToggle />
+
+          {anunciosRecientes && anunciosRecientes.length > 0 && (
+            <section className="w-full max-w-sm">
+              <h2 className="font-title text-xl text-verde-bosque">
+                Anuncios recientes
+              </h2>
+              <ul className="mt-4 flex flex-col gap-3">
+                {anunciosRecientes.map((anuncio) => (
+                  <li
+                    key={anuncio.id}
+                    className="card p-4 transition-shadow hover:shadow-md"
+                  >
+                    <Link href={`/estudiante/cursos/${anuncio.curso_id}`} className="block">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink/70">
+                        {esAnuncioNuevo(anuncio.created_at) && (
+                          <span className="badge-abierta">Nuevo</span>
+                        )}
+                        <span className="font-medium">{anuncio.cursos?.nombre}</span>
+                        <span>· {fechaAnuncio(anuncio.created_at)}</span>
+                      </div>
+                      <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm text-ink">
+                        {anuncio.contenido}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section className="w-full max-w-sm">
             <h2 className="font-title text-xl text-verde-bosque">

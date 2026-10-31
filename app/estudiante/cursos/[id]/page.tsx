@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { estadoActividad } from "@/lib/actividades";
 import { textoNotaParcial } from "@/lib/calificacion-final";
 import { obtenerResumenCursoEstudiante } from "@/lib/resumen-curso-estudiante";
+import { COLUMNAS_ANUNCIO, type Anuncio } from "@/lib/anuncios";
+import TablonAnuncios from "./tablon-anuncios";
 import TarjetaTareaEstudiante from "./tarjeta-tarea-estudiante";
 import TarjetaExamenEstudiante from "./tarjeta-examen-estudiante";
 
@@ -33,6 +35,14 @@ export default async function DetalleCursoEstudiante({
   const resumen = await obtenerResumenCursoEstudiante(supabase, id, user.id);
   if (!resumen) redirect("/estudiante");
   const { curso, resultadoFinal } = resumen;
+
+  // RLS (anuncios_select) ya limita esto a los cursos donde está inscrito.
+  const { data: anuncios } = (await supabase
+    .from("anuncios")
+    .select(COLUMNAS_ANUNCIO)
+    .eq("curso_id", id)
+    .order("fijado", { ascending: false })
+    .order("created_at", { ascending: false })) as { data: Anuncio[] | null };
 
   type PreguntaEstudiante = {
     id: string;
@@ -123,6 +133,8 @@ export default async function DetalleCursoEstudiante({
           {curso.grupo} · {curso.periodo}
         </p>
       </div>
+
+      <TablonAnuncios anuncios={anuncios ?? []} />
 
       <section className="card w-full max-w-sm p-6">
         <h2 className="font-title text-xl text-verde-bosque">
