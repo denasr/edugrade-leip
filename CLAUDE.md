@@ -299,6 +299,26 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `lib/duplicar-actividad.ts` (`duplicarActividad`), compartida con "Copiar a otro curso"
   (`copiarActividad`). La clave de acceso se genera con `lib/clave-acceso.ts`,
   compartido con `FormularioCurso`.
+- **Tipos de pregunta y orden aleatorio (exámenes y cuestionarios).** Reglas en
+  `lib/preguntas-examen.ts` (`validarPreguntas`, compartida por `crearExamen` y
+  `editarExamen`):
+  - Opción múltiple de **2 a 6 opciones** (antes siempre 4), sin opciones repetidas: la
+    correcta se guarda y se compara por su texto, así que un duplicado la haría ambigua.
+  - **Verdadero/Falso** no es un tipo aparte en la base de datos: es una pregunta de
+    opción múltiple con exactamente `["Verdadero", "Falso"]`, y el formulario la reconoce
+    así al editar (`esVerdaderoFalso`).
+  - **Orden aleatorio:** `actividades.orden_aleatorio` (migración `20261101130000`),
+    casilla por examen o cuestionario, etiqueta "Aleatorio" en la tarjeta del docente. Al
+    cargar las preguntas para el estudiante, `ordenarParaEstudiante` baraja las preguntas
+    y las opciones con una semilla `estudiante:actividad`. El orden es distinto para cada
+    estudiante pero fijo para él (no cambia al recargar). Las de Verdadero/Falso no se
+    barajan. Solo afecta la vista: las respuestas van por `pregunta_id` y por el texto de
+    la opción, así que la calificación no depende del orden. Se copia al duplicar o
+    copiar la actividad.
+
+  `FormularioCrearExamen` envía con `onSubmit` + `startTransition` en vez de
+  `action={formAction}`: con `action`, React vaciaba título, fechas y casillas tras
+  cualquier error de validación.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 import { duplicarActividad, type ActividadOrigen } from "@/lib/duplicar-actividad";
+import { validarPreguntas } from "@/lib/preguntas-examen";
 
 export type EstadoActividad = { error: string | null };
 export type EstadoConfiguracion = { error: string | null };
@@ -328,13 +329,6 @@ export async function alternarVisibilidad(
   revalidarPestanasCurso(cursoId);
 }
 
-type PreguntaEntrada = {
-  enunciado: string;
-  opciones: string[];
-  correcta: string;
-  puntos: number;
-};
-
 export async function crearExamen(
   cursoId: string,
   tipo: "TAREA" | "EXAMEN",
@@ -373,6 +367,7 @@ export async function crearExamen(
   // campo — ver formulario-crear-examen.tsx. Si no viene, intentos_permitidos
   // se queda en 1 (el default de la columna), igual que una tarea normal.
   const intentosPermitidos = formData.get("dos_intentos") === "on" ? 2 : 1;
+  const ordenAleatorio = formData.get("orden_aleatorio") === "on";
 
   if (!titulo || !fechaCierre) {
     return {
@@ -380,40 +375,16 @@ export async function crearExamen(
     };
   }
 
-  let preguntas: PreguntaEntrada[];
+  let entradaPreguntas: unknown;
   try {
-    preguntas = JSON.parse(preguntasJson);
+    entradaPreguntas = JSON.parse(preguntasJson);
   } catch {
     return { error: "No se pudieron leer las preguntas." };
   }
 
-  if (!Array.isArray(preguntas) || preguntas.length === 0) {
-    return { error: "Agrega al menos una pregunta." };
-  }
-
-  const preguntasNormalizadas = preguntas.map((p) => ({
-    enunciado: String(p.enunciado ?? "").trim(),
-    opciones: (p.opciones ?? []).map((o) => String(o).trim()),
-    correcta: String(p.correcta ?? "").trim(),
-    puntos: Number(p.puntos),
-  }));
-
-  for (const [i, p] of preguntasNormalizadas.entries()) {
-    if (!p.enunciado) {
-      return { error: `La pregunta ${i + 1} necesita un enunciado.` };
-    }
-    if (p.opciones.length !== 4 || p.opciones.some((o) => !o)) {
-      return { error: `La pregunta ${i + 1} necesita 4 opciones no vacías.` };
-    }
-    if (!p.opciones.includes(p.correcta)) {
-      return {
-        error: `La pregunta ${i + 1} necesita marcar cuál opción es correcta.`,
-      };
-    }
-    if (!Number.isFinite(p.puntos) || p.puntos <= 0) {
-      return { error: `La pregunta ${i + 1} necesita puntos mayores a 0.` };
-    }
-  }
+  const validadas = validarPreguntas(entradaPreguntas);
+  if ("error" in validadas) return validadas;
+  const preguntasNormalizadas = validadas.preguntas;
 
   const { data: actividad, error: errorInsert } = await supabase
     .from("actividades")
@@ -425,6 +396,7 @@ export async function crearExamen(
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
       intentos_permitidos: intentosPermitidos,
+      orden_aleatorio: ordenAleatorio,
     })
     .select("id")
     .single();
@@ -500,6 +472,7 @@ export async function editarExamen(
   // Mismo criterio que crearExamen: el formulario de cuestionario no manda
   // este campo, así que editar un cuestionario siempre lo deja en 1.
   const intentosPermitidos = formData.get("dos_intentos") === "on" ? 2 : 1;
+  const ordenAleatorio = formData.get("orden_aleatorio") === "on";
 
   if (!titulo || !fechaCierre) {
     return {
@@ -507,40 +480,16 @@ export async function editarExamen(
     };
   }
 
-  let preguntas: PreguntaEntrada[];
+  let entradaPreguntas: unknown;
   try {
-    preguntas = JSON.parse(preguntasJson);
+    entradaPreguntas = JSON.parse(preguntasJson);
   } catch {
     return { error: "No se pudieron leer las preguntas." };
   }
 
-  if (!Array.isArray(preguntas) || preguntas.length === 0) {
-    return { error: "Agrega al menos una pregunta." };
-  }
-
-  const preguntasNormalizadas = preguntas.map((p) => ({
-    enunciado: String(p.enunciado ?? "").trim(),
-    opciones: (p.opciones ?? []).map((o) => String(o).trim()),
-    correcta: String(p.correcta ?? "").trim(),
-    puntos: Number(p.puntos),
-  }));
-
-  for (const [i, p] of preguntasNormalizadas.entries()) {
-    if (!p.enunciado) {
-      return { error: `La pregunta ${i + 1} necesita un enunciado.` };
-    }
-    if (p.opciones.length !== 4 || p.opciones.some((o) => !o)) {
-      return { error: `La pregunta ${i + 1} necesita 4 opciones no vacías.` };
-    }
-    if (!p.opciones.includes(p.correcta)) {
-      return {
-        error: `La pregunta ${i + 1} necesita marcar cuál opción es correcta.`,
-      };
-    }
-    if (!Number.isFinite(p.puntos) || p.puntos <= 0) {
-      return { error: `La pregunta ${i + 1} necesita puntos mayores a 0.` };
-    }
-  }
+  const validadas = validarPreguntas(entradaPreguntas);
+  if ("error" in validadas) return validadas;
+  const preguntasNormalizadas = validadas.preguntas;
 
   const { error: errorUpdate } = await supabase
     .from("actividades")
@@ -550,6 +499,7 @@ export async function editarExamen(
       fecha_apertura: fechaApertura || null,
       fecha_cierre: fechaCierre,
       intentos_permitidos: intentosPermitidos,
+      orden_aleatorio: ordenAleatorio,
     })
     .eq("id", actividadId);
 
@@ -662,7 +612,7 @@ export async function copiarActividad(
   const { data: actividadOrigen } = (await supabase
     .from("actividades")
     .select(
-      "id, titulo, tipo, instrucciones, intentos_permitidos, cursos(docente_id)"
+      "id, titulo, tipo, instrucciones, intentos_permitidos, orden_aleatorio, cursos(docente_id)"
     )
     .eq("id", actividadId)
     .single()) as {
@@ -1004,7 +954,7 @@ export async function duplicarCurso(
   const { data: actividades } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, tipo, instrucciones, intentos_permitidos, fecha_apertura, fecha_cierre"
+      "id, titulo, tipo, instrucciones, intentos_permitidos, orden_aleatorio, fecha_apertura, fecha_cierre"
     )
     .eq("curso_id", cursoOrigenId)
     .order("created_at", { ascending: true });

@@ -41,6 +41,7 @@ type TareaCruda = {
   fecha_cierre: string;
   bloqueado_manual: boolean;
   visible_estudiantes: boolean;
+  orden_aleatorio: boolean;
   materiales_actividad: { nombre_archivo: string; storage_path: string }[];
 };
 
@@ -53,6 +54,7 @@ type ExamenCrudo = {
   bloqueado_manual: boolean;
   visible_estudiantes: boolean;
   intentos_permitidos: number;
+  orden_aleatorio: boolean;
 };
 
 export type TareaDelEstudiante = TareaCruda & {
@@ -119,7 +121,7 @@ export async function obtenerResumenCursoEstudiante(
   const { data: tareasCrudas } = (await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, materiales_actividad(nombre_archivo, storage_path)"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, orden_aleatorio, materiales_actividad(nombre_archivo, storage_path)"
     )
     .eq("curso_id", cursoId)
     .eq("tipo", "TAREA")
@@ -172,7 +174,7 @@ export async function obtenerResumenCursoEstudiante(
   const { data: examenesCrudos } = (await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos, orden_aleatorio"
     )
     .eq("curso_id", cursoId)
     .eq("tipo", "EXAMEN")

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { estadoActividad } from "@/lib/actividades";
 import { textoNotaParcial } from "@/lib/calificacion-final";
 import { obtenerResumenCursoEstudiante } from "@/lib/resumen-curso-estudiante";
+import { ordenarParaEstudiante } from "@/lib/preguntas-examen";
 import { COLUMNAS_ANUNCIO, type Anuncio } from "@/lib/anuncios";
 import TablonAnuncios from "./tablon-anuncios";
 import TarjetaTareaEstudiante from "./tarjeta-tarea-estudiante";
@@ -63,6 +64,9 @@ export default async function DetalleCursoEstudiante({
           .eq("actividad_id", actividad.id)
           .order("orden", { ascending: true });
         preguntas = (data ?? []) as PreguntaEstudiante[];
+        if (actividad.orden_aleatorio) {
+          preguntas = ordenarParaEstudiante(preguntas, user.id, actividad.id);
+        }
       }
 
       // Un cuestionario no tiene material de apoyo ni archivo que descargar
@@ -108,6 +112,9 @@ export default async function DetalleCursoEstudiante({
           .eq("actividad_id", examen.id)
           .order("orden", { ascending: true });
         preguntas = (data ?? []) as PreguntaEstudiante[];
+        if (examen.orden_aleatorio) {
+          preguntas = ordenarParaEstudiante(preguntas, user.id, examen.id);
+        }
       }
 
       return {

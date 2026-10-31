@@ -52,7 +52,7 @@ export default async function ExamenesCurso({
     supabase
       .from("actividades")
       .select(
-        "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos"
+        "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, intentos_permitidos, orden_aleatorio"
       )
       .eq("curso_id", id)
       .eq("tipo", "EXAMEN")

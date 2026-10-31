@@ -52,7 +52,7 @@ export default async function TareasCurso({
   const { data: actividades } = await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, materiales_actividad(nombre_archivo)"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, orden_aleatorio, materiales_actividad(nombre_archivo)"
     )
     .eq("curso_id", id)
     .eq("tipo", "TAREA")

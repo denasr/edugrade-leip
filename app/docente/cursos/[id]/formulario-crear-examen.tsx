@@ -1,20 +1,30 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { startTransition, useActionState, useRef, useState } from "react";
 import { crearExamen, editarExamen } from "./actions";
 import type { EstadoActividad } from "./actions";
 import { fechaParaInput } from "@/lib/actividades";
+import {
+  MAXIMO_OPCIONES,
+  MINIMO_OPCIONES,
+  OPCIONES_VERDADERO_FALSO,
+  esVerdaderoFalso,
+} from "@/lib/preguntas-examen";
 import { useToast } from "../../../toast-provider";
 
 type PreguntaForm = {
   enunciado: string;
-  opciones: [string, string, string, string];
+  // Verdadero/Falso: las opciones son siempre OPCIONES_VERDADERO_FALSO y no
+  // se editan; las de opción múltiple se conservan aparte por si el docente
+  // vuelve a cambiar el tipo sin querer perder lo que ya escribió.
+  verdaderoFalso: boolean;
+  opciones: string[];
   correcta: number;
   puntos: number;
 };
 
 function preguntaVacia(): PreguntaForm {
-  return { enunciado: "", opciones: ["", "", "", ""], correcta: 0, puntos: 5 };
+  return { enunciado: "", verdaderoFalso: false, opciones: ["", "", "", ""], correcta: 0, puntos: 5 };
 }
 
 type PreguntaExistente = {
@@ -32,18 +42,23 @@ type ExamenExistente = {
   fecha_cierre: string;
   preguntas: PreguntaExistente[];
   intentosPermitidos?: number;
+  ordenAleatorio?: boolean;
 };
 
 function preguntasIniciales(examenExistente?: ExamenExistente): PreguntaForm[] {
   if (!examenExistente || examenExistente.preguntas.length === 0) {
     return [preguntaVacia()];
   }
-  return examenExistente.preguntas.map((p) => ({
-    enunciado: p.enunciado,
-    opciones: [p.opciones[0] ?? "", p.opciones[1] ?? "", p.opciones[2] ?? "", p.opciones[3] ?? ""],
-    correcta: Math.max(0, p.opciones.indexOf(p.correcta)),
-    puntos: p.puntos,
-  }));
+  return examenExistente.preguntas.map((p) => {
+    const verdaderoFalso = esVerdaderoFalso(p.opciones);
+    return {
+      enunciado: p.enunciado,
+      verdaderoFalso,
+      opciones: verdaderoFalso ? ["", "", "", ""] : [...p.opciones],
+      correcta: Math.max(0, p.opciones.indexOf(p.correcta)),
+      puntos: p.puntos,
+    };
+  });
 }
 
 const estadoInicial: EstadoActividad = { error: null };
@@ -114,11 +129,37 @@ export default function FormularioCrearExamen({
     setPreguntas((actual) =>
       actual.map((p, i) => {
         if (i !== indice) return p;
-        const opciones = [...p.opciones] as PreguntaForm["opciones"];
+        const opciones = [...p.opciones];
         opciones[opcionIndice] = valor;
         return { ...p, opciones };
       })
     );
+  }
+
+  function agregarOpcion(indice: number) {
+    setPreguntas((actual) =>
+      actual.map((p, i) => (i === indice ? { ...p, opciones: [...p.opciones, ""] } : p))
+    );
+  }
+
+  function quitarOpcion(indice: number, opcionIndice: number) {
+    setPreguntas((actual) =>
+      actual.map((p, i) => {
+        if (i !== indice) return p;
+        // La correcta se guarda por posición: si se quita una de arriba, se
+        // recorre para seguir apuntando a la misma opción.
+        let correcta = p.correcta;
+        if (opcionIndice < correcta) correcta -= 1;
+        else if (opcionIndice === correcta) correcta = 0;
+        return { ...p, opciones: p.opciones.filter((_, j) => j !== opcionIndice), correcta };
+      })
+    );
+  }
+
+  function cambiarTipoPregunta(indice: number, verdaderoFalso: boolean) {
+    // correcta vuelve a 0 porque las posiciones de un tipo no corresponden
+    // a las del otro.
+    actualizarPregunta(indice, { verdaderoFalso, correcta: 0 });
   }
 
   function agregarPregunta() {
@@ -138,12 +179,15 @@ export default function FormularioCrearExamen({
   }
 
   const preguntasJson = JSON.stringify(
-    preguntas.map((p) => ({
-      enunciado: p.enunciado,
-      opciones: p.opciones,
-      correcta: p.opciones[p.correcta],
-      puntos: p.puntos,
-    }))
+    preguntas.map((p) => {
+      const opciones = p.verdaderoFalso ? OPCIONES_VERDADERO_FALSO : p.opciones;
+      return {
+        enunciado: p.enunciado,
+        opciones,
+        correcta: opciones[p.correcta],
+        puntos: p.puntos,
+      };
+    })
   );
 
   if (!editando && !abierto) {
@@ -159,7 +203,20 @@ export default function FormularioCrearExamen({
   }
 
   return (
-    <form ref={formRef} action={formAction} className="card w-full max-w-sm p-6">
+    <form
+      ref={formRef}
+      // onSubmit en vez de action={formAction}: con action, React vacía los
+      // campos no controlados (título, fechas, casillas) en cuanto termina el
+      // envío, aunque haya fallado la validación — el docente perdía todo lo
+      // que no fueran las preguntas. Así el formulario solo se limpia cuando
+      // sí se guardó (formRef.current.reset() en guardarConAviso).
+      onSubmit={(e) => {
+        e.preventDefault();
+        const datos = new FormData(e.currentTarget);
+        startTransition(() => formAction(datos));
+      }}
+      className="card w-full max-w-sm p-6"
+    >
       <h2 className="font-title text-xl text-verde-bosque">
         {editando ? `Editar ${etiqueta}` : `Nuevo ${etiqueta}`}
       </h2>
@@ -231,6 +288,21 @@ export default function FormularioCrearExamen({
           </label>
         )}
 
+        <label className="flex items-start gap-2 text-sm text-ink/80">
+          <input
+            type="checkbox"
+            name="orden_aleatorio"
+            defaultChecked={examenExistente?.ordenAleatorio ?? false}
+            className="mt-1 accent-verde-bosque"
+          />
+          <span>
+            Orden aleatorio
+            <span className="block text-xs text-ink/70">
+              Cada estudiante ve las preguntas y las opciones en distinto orden.
+            </span>
+          </span>
+        </label>
+
         <div className="flex flex-col gap-3 border-t border-verde-bosque/15 pt-3">
           <p className="text-sm font-medium text-ink/80">Preguntas</p>
 
@@ -265,34 +337,89 @@ export default function FormularioCrearExamen({
                 className="input text-sm"
               />
 
-              {pregunta.opciones.map((opcion, opcionIndice) => (
-                <label
-                  key={opcionIndice}
-                  className="flex items-center gap-2 text-sm text-ink/80"
+              <div
+                role="group"
+                aria-label={`Tipo de la pregunta ${indice + 1}`}
+                className="flex gap-1 text-xs"
+              >
+                {[
+                  { valor: false, etiqueta: "Opción múltiple" },
+                  { valor: true, etiqueta: "Verdadero/Falso" },
+                ].map((tipoPregunta) => (
+                  <button
+                    key={tipoPregunta.etiqueta}
+                    type="button"
+                    aria-pressed={pregunta.verdaderoFalso === tipoPregunta.valor}
+                    onClick={() => cambiarTipoPregunta(indice, tipoPregunta.valor)}
+                    className={`rounded-full border px-3 py-1.5 font-medium transition-colors ${
+                      pregunta.verdaderoFalso === tipoPregunta.valor
+                        ? "border-verde-bosque bg-verde-bosque text-crema"
+                        : "border-verde-bosque/30 text-verde-bosque hover:bg-verde-bosque/10"
+                    }`}
+                  >
+                    {tipoPregunta.etiqueta}
+                  </button>
+                ))}
+              </div>
+
+              {pregunta.verdaderoFalso
+                ? OPCIONES_VERDADERO_FALSO.map((opcion, opcionIndice) => (
+                    <label
+                      key={opcion}
+                      className="flex min-h-9 items-center gap-2 text-sm text-ink/80"
+                    >
+                      <input
+                        type="radio"
+                        name={`correcta-${indice}`}
+                        checked={pregunta.correcta === opcionIndice}
+                        onChange={() => actualizarPregunta(indice, { correcta: opcionIndice })}
+                        className="accent-verde-bosque"
+                      />
+                      {opcion}
+                    </label>
+                  ))
+                : pregunta.opciones.map((opcion, opcionIndice) => (
+                    <div key={opcionIndice} className="flex items-center gap-2 text-sm text-ink/80">
+                      <input
+                        type="radio"
+                        name={`correcta-${indice}`}
+                        aria-label={`Marcar la opción ${opcionIndice + 1} como correcta`}
+                        checked={pregunta.correcta === opcionIndice}
+                        onChange={() => actualizarPregunta(indice, { correcta: opcionIndice })}
+                        className="accent-verde-bosque"
+                      />
+                      <input
+                        type="text"
+                        required
+                        placeholder={`Opción ${opcionIndice + 1}`}
+                        value={opcion}
+                        onChange={(e) => actualizarOpcion(indice, opcionIndice, e.target.value)}
+                        className="input flex-1 py-1 text-sm"
+                      />
+                      {pregunta.opciones.length > MINIMO_OPCIONES && (
+                        <button
+                          type="button"
+                          onClick={() => quitarOpcion(indice, opcionIndice)}
+                          aria-label={`Quitar la opción ${opcionIndice + 1}`}
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink/70 hover:bg-terracota/10 hover:text-terracota"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+              {!pregunta.verdaderoFalso && pregunta.opciones.length < MAXIMO_OPCIONES && (
+                <button
+                  type="button"
+                  onClick={() => agregarOpcion(indice)}
+                  className="inline-flex min-h-9 items-center self-start text-xs font-medium text-verde-bosque hover:underline"
                 >
-                  <input
-                    type="radio"
-                    name={`correcta-${indice}`}
-                    checked={pregunta.correcta === opcionIndice}
-                    onChange={() =>
-                      actualizarPregunta(indice, { correcta: opcionIndice })
-                    }
-                    className="accent-verde-bosque"
-                  />
-                  <input
-                    type="text"
-                    required
-                    placeholder={`Opción ${opcionIndice + 1}`}
-                    value={opcion}
-                    onChange={(e) =>
-                      actualizarOpcion(indice, opcionIndice, e.target.value)
-                    }
-                    className="input flex-1 py-1 text-sm"
-                  />
-                </label>
-              ))}
+                  + Agregar opción
+                </button>
+              )}
               <span className="text-xs text-ink/70">
-                Marca con el radio cuál opción es la correcta.
+                Marca con el círculo cuál es la respuesta correcta.
               </span>
 
               <label className="flex items-center gap-2 text-sm text-ink/80">

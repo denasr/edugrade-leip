@@ -21,6 +21,7 @@ type Examen = {
   // consulta — siempre es de un solo intento, sin UI para cambiarlo, así
   // que el default de abajo ya refleja ese caso correctamente.
   intentos_permitidos?: number;
+  orden_aleatorio?: boolean;
 };
 
 type Pregunta = {
@@ -74,6 +75,7 @@ export default function TarjetaExamen({
             fecha_cierre: examen.fecha_cierre,
             preguntas,
             intentosPermitidos: examen.intentos_permitidos,
+            ordenAleatorio: examen.orden_aleatorio,
           }}
           tieneRespuestas={stats.presentados > 0}
           onCancelar={() => setEditando(false)}
@@ -147,6 +149,11 @@ export default function TarjetaExamen({
         <div className="flex shrink-0 items-center gap-1.5">
           {!examen.visible_estudiantes && (
             <span className="badge-oculta">Oculta</span>
+          )}
+          {examen.orden_aleatorio && (
+            <span className="inline-block shrink-0 rounded-full bg-verde-bosque/8 px-2.5 py-0.5 text-xs font-medium text-verde-bosque">
+              Aleatorio
+            </span>
           )}
           {(examen.intentos_permitidos ?? 1) > 1 && (
             <span className="inline-block shrink-0 rounded-full bg-verde-bosque/8 px-2.5 py-0.5 text-xs font-medium text-verde-bosque">
