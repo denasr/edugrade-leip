@@ -44,7 +44,9 @@ export async function calificarEntrega(
     return { error: error.message };
   }
 
-  revalidatePath(`/docente/actividades/${actividadId}`);
+  // "layout": también el modo revisión (revisar/[entregaId]), que cuelga
+  // de esta ruta y muestra cuántas faltan por calificar.
+  revalidatePath(`/docente/actividades/${actividadId}`, "layout");
   return { error: null };
 }
 

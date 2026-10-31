@@ -252,6 +252,27 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   renderizan en el servidor. RLS: lee el docente dueño o un inscrito
   (`esta_inscrito_en_curso`), y solo el docente dueño escribe. Con la sexta pestaña, la
   franja de pestañas va en 2 filas de 3 en celular y en una sola fila desde `sm`.
+- **Modo revisión de entregas.** `/docente/actividades/[id]/revisar/[entregaId]`: una
+  entrega a la vez, con el archivo a la vista y la calificación al lado (en celular,
+  abajo). Se entra desde el botón "Calificar una por una (n sin calificar)" de la lista,
+  que abre la primera sin calificar, o desde "Ver archivo y calificar aquí" en cada
+  entrega. "Guardar y siguiente" (`siguienteHref` en `FormularioCalificacion`) salta a
+  la siguiente **sin calificar** dando la vuelta al final, y cuando ya no queda ninguna
+  regresa a la lista. "Anterior / Siguiente" recorren todas en el orden de la lista. Una
+  entrega a medias (sin archivos) no cuenta como "sin calificar". Vista previa por
+  extensión (`lib/vista-previa-archivo.ts`):
+  - **PDF:** `<iframe>` con la URL firmada (Supabase la sirve inline y sin
+    `X-Frame-Options`). En celular, solo el enlace, porque los navegadores móviles no
+    muestran PDF incrustado.
+  - **JPG/PNG:** `<img>`. **HEIC:** solo enlace (únicamente Safari lo muestra).
+  - **DOCX:** se convierte a HTML en el servidor con `mammoth` y se muestra en un
+    `<iframe sandbox="">` sin scripts. Es una vista aproximada (sin márgenes ni fuentes),
+    por eso siempre está también "Abrir aparte". Se eligió esto en vez del visor de
+    Microsoft Office para que el trabajo del estudiante no salga a un servicio externo.
+
+  Enlaces firmados de 30 min (la lista sigue con 10). `calificarEntrega` revalida con
+  `"layout"` para que también se actualice el conteo del modo revisión. La prueba e2e usa
+  `tests/e2e/fixtures/prueba.docx`, generado con `jszip`.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,

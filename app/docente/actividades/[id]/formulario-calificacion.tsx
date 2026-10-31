@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { calificarEntrega, type EstadoCalificacion } from "./actions";
 import { useToast } from "../../../toast-provider";
 
@@ -11,13 +12,18 @@ export default function FormularioCalificacion({
   entregaId,
   notaActual,
   comentarioActual,
+  siguienteHref,
 }: {
   actividadId: string;
   entregaId: string;
   notaActual: number | null;
   comentarioActual: string | null;
+  // Solo en el modo revisión: a dónde lleva "Guardar y siguiente" (la
+  // siguiente entrega sin calificar, o de vuelta a la lista si ya no hay).
+  siguienteHref?: string;
 }) {
   const { mostrar } = useToast();
+  const router = useRouter();
 
   async function calificarConAviso(
     prevState: EstadoCalificacion,
@@ -31,6 +37,9 @@ export default function FormularioCalificacion({
     );
     if (!resultado.error) {
       mostrar("Calificación guardada.");
+      if (siguienteHref && formData.get("despues") === "siguiente") {
+        router.push(siguienteHref);
+      }
     }
     return resultado;
   }
@@ -71,17 +80,32 @@ export default function FormularioCalificacion({
 
       {state.error && <p className="text-sm text-terracota">{state.error}</p>}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="btn-primary self-start px-4 py-1.5"
-      >
-        {pending
-          ? "Guardando…"
-          : notaActual !== null
-            ? "Actualizar calificación"
-            : "Calificar"}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {siguienteHref && (
+          <button
+            type="submit"
+            name="despues"
+            value="siguiente"
+            disabled={pending}
+            className="btn-primary px-4 py-1.5"
+          >
+            {pending ? "Guardando…" : "Guardar y siguiente →"}
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={pending}
+          className={`${siguienteHref ? "btn-secondary" : "btn-primary"} self-start px-4 py-1.5`}
+        >
+          {pending && !siguienteHref
+            ? "Guardando…"
+            : notaActual !== null
+              ? "Actualizar calificación"
+              : siguienteHref
+                ? "Solo guardar"
+                : "Calificar"}
+        </button>
+      </div>
     </form>
   );
 }

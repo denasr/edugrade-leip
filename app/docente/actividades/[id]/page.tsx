@@ -77,6 +77,17 @@ export default async function DetalleActividadDocente({
 
   const actividadAbierta = estadoActividad(actividad) === "ABIERTA";
 
+  // Modo revisión: arranca en la primera entrega sin calificar (con
+  // archivos — una a medias no tiene nada que revisar), o en la primera si
+  // ya están todas calificadas.
+  const primeraPendiente = (entregas ?? []).find(
+    (e) => e.evaluaciones === null && e.archivos_entrega.length > 0
+  );
+  const pendientesPorCalificar = (entregas ?? []).filter(
+    (e) => e.evaluaciones === null && e.archivos_entrega.length > 0
+  ).length;
+  const inicioRevision = primeraPendiente ?? entregas?.[0] ?? null;
+
   const estudianteIds = [...new Set((entregas ?? []).map((e) => e.estudiante_id))];
   const { data: perfilesEstudiantes } =
     estudianteIds.length > 0
@@ -131,6 +142,17 @@ export default async function DetalleActividadDocente({
       <section className="w-full max-w-sm">
         <h2 className="font-title text-xl text-verde-bosque">Entregas</h2>
 
+        {inicioRevision && (
+          <Link
+            href={`/docente/actividades/${id}/revisar/${inicioRevision.id}`}
+            className="btn-primary mt-4 w-full"
+          >
+            {pendientesPorCalificar > 0
+              ? `Calificar una por una (${pendientesPorCalificar} sin calificar)`
+              : "Revisar una por una"}
+          </Link>
+        )}
+
         {entregasConEnlace.length === 0 ? (
           <p className="mt-4 text-sm text-ink/70">
             Todavía no hay entregas para esta tarea.
@@ -161,6 +183,15 @@ export default async function DetalleActividadDocente({
                   <p className="mt-1 text-xs text-ink/70">
                     {new Date(entrega.created_at).toLocaleString("es-MX")}
                   </p>
+
+                  {entrega.archivosConEnlace.length > 0 && (
+                    <Link
+                      href={`/docente/actividades/${id}/revisar/${entrega.id}`}
+                      className="mt-1 inline-block text-sm font-medium text-verde-bosque hover:underline"
+                    >
+                      Ver archivo y calificar aquí →
+                    </Link>
+                  )}
 
                   {entrega.comentario_estudiante && (
                     <p className="mt-1 text-sm text-ink/70">
