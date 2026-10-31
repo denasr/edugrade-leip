@@ -7,6 +7,7 @@ import {
   textoRelativoCierre,
   cierraPronto,
 } from "@/lib/actividades";
+import AvisoPorVencer from "./aviso-por-vencer";
 import FormularioInscripcion from "./formulario-inscripcion";
 
 // select("cursos(...)") es una relación many-to-one (FK en inscripciones),
@@ -154,13 +155,16 @@ export default async function PanelEstudiante() {
                             {actividad.tipo === "EXAMEN" ? "Examen" : "Tarea"}
                           </p>
                         </div>
-                        <span
-                          className={`shrink-0 text-xs font-medium ${
-                            urgente ? "text-terracota" : "text-ink/70"
-                          }`}
-                        >
-                          {textoRelativoCierre(actividad.fecha_cierre)}
-                        </span>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          {urgente && <AvisoPorVencer />}
+                          <span
+                            className={`text-xs font-medium ${
+                              urgente ? "text-terracota" : "text-ink/70"
+                            }`}
+                          >
+                            {textoRelativoCierre(actividad.fecha_cierre)}
+                          </span>
+                        </div>
                       </Link>
                     </li>
                   );

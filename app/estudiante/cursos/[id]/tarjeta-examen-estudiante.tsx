@@ -8,6 +8,7 @@ import {
   textoRelativoCierre,
   cierraPronto,
 } from "@/lib/actividades";
+import AvisoPorVencer from "../../aviso-por-vencer";
 import FormularioPresentarExamen from "./formulario-presentar-examen";
 import { obtenerRevisionExamen, type PreguntaRevisada } from "./actions";
 
@@ -115,7 +116,10 @@ export default function TarjetaExamenEstudiante({
     <li className="card p-4">
       <div className="flex items-start justify-between gap-2">
         <p className="font-medium text-ink">{examen.titulo}</p>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {estado === "ABIERTA" && !examen.entrega && cierraPronto(examen.fecha_cierre) && (
+            <AvisoPorVencer />
+          )}
           <span className={estado === "ABIERTA" ? "badge-abierta" : "badge-cerrada"}>
             {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
           </span>

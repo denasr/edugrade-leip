@@ -231,6 +231,13 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   ruta responde 401 sin sesión, 403 a un docente y 404 a un estudiante no inscrito. Las
   fechas se muestran en hora de `America/Mexico_City`. La prueba e2e lee el texto del PDF
   con `unpdf` (solo dependencia de desarrollo).
+- **Aviso "Por vencer".** Etiqueta terracota con un punto que parpadea
+  (`AvisoPorVencer`, `app/estudiante/aviso-por-vencer.tsx`, clase `.badge-por-vencer`) en la
+  lista de Pendientes del panel del estudiante y en las tarjetas de tarea y examen de su
+  curso, cuando la actividad está abierta, el estudiante todavía no la entrega y cierra en
+  menos de 2 días (`cierraPronto`, que antes era de 1 día). Una tarea entregada a medias
+  (sin archivos ni calificación) sí lleva el aviso, igual que en el resto de la app. El
+  docente no lo ve.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,

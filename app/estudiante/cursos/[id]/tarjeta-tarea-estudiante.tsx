@@ -9,6 +9,7 @@ import {
   cierraPronto,
 } from "@/lib/actividades";
 import { IconoArchivo } from "@/lib/icono-archivo";
+import AvisoPorVencer from "../../aviso-por-vencer";
 import FormularioEntrega from "./formulario-entrega";
 import TarjetaExamenEstudiante from "./tarjeta-examen-estudiante";
 
@@ -125,7 +126,10 @@ export default function TarjetaTareaEstudiante({
     <li className="card p-4">
       <div className="flex items-start justify-between gap-2">
         <p className="font-medium text-ink">{actividad.titulo}</p>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {estado === "ABIERTA" && !entregaReal && cierraPronto(actividad.fecha_cierre) && (
+            <AvisoPorVencer />
+          )}
           <span className={estado === "ABIERTA" ? "badge-abierta" : "badge-cerrada"}>
             {estado === "ABIERTA" ? "Abierta" : "Cerrada"}
           </span>
