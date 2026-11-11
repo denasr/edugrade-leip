@@ -166,6 +166,12 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   Android (`image/jpg`, `application/octet-stream`), y antes rechazaba archivos válidos.
   Las subidas fallidas se reportan a Sentry (`flujo: entrega-tarea`): ocurren en el
   navegador y no dejan ningún otro rastro.
+- **Reintento automático de subidas.** Casi todos los fallos reales de entrega fueron
+  "Failed to fetch": el celular perdía la red a mitad del POST a Storage (en los logs de
+  Supabase aparece el OPTIONS, pero el POST nunca llega). `subirConReintentos`
+  (`formulario-entrega.tsx`) reintenta hasta 3 veces solo ante cortes de red, y trata
+  "The resource already exists" como éxito, porque la ruta es única por entrega e índice
+  y `crearEntrega` vacía la carpeta antes. Solo se reporta a Sentry si fallan los 3 intentos.
 - **Recuperar contraseña.** `/recuperar` pide el enlace con un cliente aparte de flujo
   `implicit`, no con el cliente PKCE de `@supabase/ssr`. Con PKCE el enlace solo se podía
   canjear en el mismo navegador donde se pidió (el `code_verifier` vive en una cookie), y

@@ -206,6 +206,46 @@ test.describe("Entrega de tarea con archivo", () => {
     await expect(tarjeta.getByText("Entregaste: Mi tarea (final).docx")).toBeVisible();
   });
 
+  test("si la conexión se corta a mitad de la subida, se reintenta sola y la entrega se completa", async ({
+    page,
+  }) => {
+    // Regresión de producción (Sentry VIRTUAL-GRADE-3): en celulares con
+    // red inestable el POST a Storage nunca llegaba ("Failed to fetch") y
+    // el estudiante tenía que volver a empezar. Aquí se aborta el primer
+    // envío del archivo para simular ese corte.
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    await admin.from("actividades").insert({
+      curso_id: cursoId,
+      titulo: "Tarea E2E corte de red",
+      tipo: "TAREA",
+      fecha_cierre: "2099-12-31T23:59:00Z",
+    });
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+
+    let cortados = 0;
+    await page.route("**/storage/v1/object/archivos-entrega/**", (route) => {
+      if (route.request().method() === "POST" && cortados === 0) {
+        cortados++;
+        return route.abort("internetdisconnected");
+      }
+      return route.continue();
+    });
+
+    const tarjeta = page.locator("li", { hasText: "Tarea E2E corte de red" });
+    await tarjeta
+      .locator('input[name="archivos"]')
+      .setInputFiles(path.join(__dirname, "fixtures", "prueba.pdf"));
+    await tarjeta.getByRole("button", { name: "Entregar tarea" }).click();
+    await expect(tarjeta.getByText("Entregaste: prueba.pdf")).toBeVisible();
+    expect(cortados).toBe(1);
+  });
+
   test("el docente elimina una entrega con archivo equivocado (ya calificada) y el estudiante puede volver a entregar", async ({
     page,
   }) => {

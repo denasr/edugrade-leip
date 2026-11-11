@@ -58,7 +58,54 @@ function mensajeErrorSubida(mensaje: string, nombreArchivo: string): string {
   if (m.includes("jwt") || m.includes("unauthorized") || m.includes("row-level")) {
     return "Tu sesión expiró. Recarga la página, vuelve a iniciar sesión e intenta de nuevo.";
   }
-  return "No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.";
+  return `Se cortó la conexión mientras se subía "${nombreArchivo}". Mantén la pantalla encendida y, si puedes, conéctate a Wi-Fi e intenta de nuevo.`;
+}
+
+// Casi todas las subidas fallidas en producción fueron "Failed to fetch":
+// el celular perdió la conexión a mitad del envío y la petición nunca llegó
+// a Storage (el OPTIONS previo sí aparece en los logs, el POST no). Un
+// reintento automático salva la mayoría de esos cortes sin que el
+// estudiante tenga que volver a empezar. Safari reporta lo mismo como
+// "Load failed".
+function esCorteDeRed(error: { name?: string; message: string }): boolean {
+  const m = error.message.toLowerCase();
+  return (
+    error.name === "StorageUnknownError" ||
+    m.includes("failed to fetch") ||
+    m.includes("load failed") ||
+    m.includes("network")
+  );
+}
+
+// En una red inestable el navegador puede reenviar la misma petición (o el
+// primer intento sí llegó y solo se perdió la respuesta), y entonces Storage
+// contesta "The resource already exists". La ruta es única para esta
+// entrega e índice, y crearEntrega vacía la carpeta antes de devolver el
+// entregaId, así que lo que ya existe ahí es este mismo archivo: cuenta
+// como subido.
+function yaExiste(error: { message: string; statusCode?: string }): boolean {
+  return error.statusCode === "409" || error.message.toLowerCase().includes("already exists");
+}
+
+const INTENTOS_SUBIDA = 3;
+
+async function subirConReintentos(
+  supabase: ReturnType<typeof createClient>,
+  storagePath: string,
+  archivo: File,
+  contentType: string
+) {
+  let ultimoError: { name?: string; message: string; statusCode?: string } | null = null;
+  for (let intento = 1; intento <= INTENTOS_SUBIDA; intento++) {
+    const { error } = await supabase.storage
+      .from("archivos-entrega")
+      .upload(storagePath, archivo, { contentType });
+    if (!error || yaExiste(error)) return { error: null };
+    ultimoError = error;
+    if (!esCorteDeRed(error) || intento === INTENTOS_SUBIDA) break;
+    await new Promise((r) => setTimeout(r, 1500 * intento));
+  }
+  return { error: ultimoError };
 }
 
 export default function FormularioEntrega({
@@ -149,9 +196,12 @@ export default function FormularioEntrega({
           : "Subiendo archivo…"
       );
       const storagePath = `${entregaId}/${indice}-${nombreArchivoSeguro(archivo.name)}`;
-      const { error: errorSubida } = await supabase.storage
-        .from("archivos-entrega")
-        .upload(storagePath, archivo, { contentType: tipoDeArchivo(archivo)! });
+      const { error: errorSubida } = await subirConReintentos(
+        supabase,
+        storagePath,
+        archivo,
+        tipoDeArchivo(archivo)!
+      );
 
       if (errorSubida) {
         console.error("Error al subir archivo de entrega:", errorSubida);
