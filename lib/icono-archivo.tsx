@@ -1,4 +1,4 @@
-import { File, FileImage, FileText, FileType } from "lucide-react";
+import { File, FileImage, FileText, FileType, Presentation } from "lucide-react";
 
 const IMAGENES = ["jpg", "jpeg", "png"];
 
@@ -16,6 +16,9 @@ export function IconoArchivo({
   }
   if (extension === "docx") {
     return <FileType className={className} aria-hidden="true" />;
+  }
+  if (extension === "pptx") {
+    return <Presentation className={className} aria-hidden="true" />;
   }
   if (extension && IMAGENES.includes(extension)) {
     return <FileImage className={className} aria-hidden="true" />;

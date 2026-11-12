@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 import { duplicarActividad, type ActividadOrigen } from "@/lib/duplicar-actividad";
+import { duplicarRecursosCurso } from "@/lib/duplicar-recursos";
+import { BUCKET_RECURSOS } from "@/lib/recursos";
 import { validarPreguntas } from "@/lib/preguntas-examen";
 
 export type EstadoActividad = { error: string | null };
@@ -909,8 +911,9 @@ export type EstadoDuplicarCurso = { error: string | null; nuevoCursoId?: string 
 // Curso nuevo para otro semestre/grupo a partir de uno existente: copia la
 // ponderación y todas sus tareas, cuestionarios y exámenes (con preguntas y
 // material), ocultas y con sus fechas originales para que el docente las
-// ajuste y publique una por una. No copia estudiantes, entregas,
-// asistencia ni anuncios — eso es de cada semestre.
+// ajuste y publique una por una, más las unidades y recursos del curso (con
+// su visibilidad). No copia estudiantes, entregas, asistencia ni anuncios —
+// eso es de cada semestre.
 export async function duplicarCurso(
   cursoOrigenId: string,
   _estadoPrevio: EstadoDuplicarCurso,
@@ -974,6 +977,24 @@ export async function duplicarCurso(
     .eq("curso_id", cursoOrigenId)
     .order("created_at", { ascending: true });
 
+  // Todo o nada: si algo falla se borra el curso a medias (actividades,
+  // unidades y recursos se van por cascade) y los archivos que ya se habían
+  // copiado en Storage, que no dependen de ninguna FK.
+  async function deshacer(rutasRecursos: string[]) {
+    const { data: materiales } = await supabase
+      .from("materiales_actividad")
+      .select("storage_path, actividades!inner(curso_id)")
+      .eq("actividades.curso_id", nuevo!.id);
+    const rutas = (materiales ?? []).map((m) => m.storage_path);
+    if (rutas.length > 0) {
+      await supabase.storage.from("materiales-actividades").remove(rutas);
+    }
+    if (rutasRecursos.length > 0) {
+      await supabase.storage.from(BUCKET_RECURSOS).remove(rutasRecursos);
+    }
+    await supabase.from("cursos").delete().eq("id", nuevo!.id);
+  }
+
   for (const actividad of actividades ?? []) {
     const { error } = await duplicarActividad(supabase, actividad, nuevo.id, {
       fecha_apertura: actividad.fecha_apertura,
@@ -981,19 +1002,15 @@ export async function duplicarCurso(
     });
 
     if (error) {
-      // Todo o nada: se borra el curso a medias (sus actividades se van por
-      // cascade) y los archivos de material que ya se habían copiado.
-      const { data: materiales } = await supabase
-        .from("materiales_actividad")
-        .select("storage_path, actividades!inner(curso_id)")
-        .eq("actividades.curso_id", nuevo.id);
-      const rutas = (materiales ?? []).map((m) => m.storage_path);
-      if (rutas.length > 0) {
-        await supabase.storage.from("materiales-actividades").remove(rutas);
-      }
-      await supabase.from("cursos").delete().eq("id", nuevo.id);
+      await deshacer([]);
       return { error: `No se pudo copiar "${actividad.titulo}": ${error}` };
     }
+  }
+
+  const copiaRecursos = await duplicarRecursosCurso(supabase, cursoOrigenId, nuevo.id);
+  if (copiaRecursos.error) {
+    await deshacer(copiaRecursos.rutasCopiadas);
+    return { error: copiaRecursos.error };
   }
 
   revalidatePath("/docente");

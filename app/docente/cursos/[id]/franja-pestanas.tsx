@@ -7,6 +7,7 @@ type IdPestana =
   | "examenes"
   | "asistencia"
   | "anuncios"
+  | "recursos"
   | "estudiantes";
 
 const PESTANAS: { id: IdPestana; etiqueta: string; sufijo: string }[] = [
@@ -15,6 +16,7 @@ const PESTANAS: { id: IdPestana; etiqueta: string; sufijo: string }[] = [
   { id: "examenes", etiqueta: "Exámenes", sufijo: "/examenes" },
   { id: "asistencia", etiqueta: "Asistencia", sufijo: "/asistencia" },
   { id: "anuncios", etiqueta: "Anuncios", sufijo: "/anuncios" },
+  { id: "recursos", etiqueta: "Recursos", sufijo: "/recursos" },
   { id: "estudiantes", etiqueta: "Estudiantes", sufijo: "/estudiantes" },
 ];
 
@@ -33,9 +35,9 @@ export default function FranjaPestanas({
 }) {
   return (
     <nav
-      // 6 pestañas no caben en una sola línea a 375px: en celular van en dos
-      // filas de 3, y desde sm en una sola fila como antes.
-      className="grid w-full max-w-sm grid-cols-3 border-b border-verde-bosque/15 sm:flex sm:max-w-xl lg:max-w-4xl"
+      // 7 pestañas no caben en una sola línea a 375px: en celular van en dos
+      // filas (4 + 3), y desde sm en una sola fila.
+      className="grid w-full max-w-sm grid-cols-4 border-b border-verde-bosque/15 sm:flex sm:max-w-xl lg:max-w-4xl"
       aria-label="Secciones del curso"
     >
       {PESTANAS.map((pestana) => {

@@ -256,8 +256,40 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   clicables con `lib/texto-con-enlaces.tsx`, que arma elementos de React (nunca HTML
   crudo). Fechas en hora de `America/Mexico_City` (`fechaAnuncio`), porque también se
   renderizan en el servidor. RLS: lee el docente dueño o un inscrito
-  (`esta_inscrito_en_curso`), y solo el docente dueño escribe. Con la sexta pestaña, la
-  franja de pestañas va en 2 filas de 3 en celular y en una sola fila desde `sm`.
+  (`esta_inscrito_en_curso`), y solo el docente dueño escribe.
+- **Recursos del curso.** Migración `20261111120000`: material de consulta fuera de
+  tareas y exámenes (lecturas, presentaciones, imágenes, ligas), organizado por
+  **unidades**. El docente lo administra en la pestaña **Recursos**
+  (`/docente/cursos/[id]/recursos`): crea, renombra, reordena (↑/↓), oculta y elimina
+  unidades; dentro de cada una agrega **archivos** (PDF, DOCX, PPTX, JPG, PNG, hasta
+  25 MB) o **enlaces** (http/https; sin esquema se completa con `https://`), y los edita,
+  reordena, mueve de unidad, oculta o elimina. El estudiante los ve al final de la
+  página de su curso (`RecursosCurso`), una unidad plegable por `<details>` (la última
+  abierta), sin las unidades ni los recursos ocultos.
+  - Tablas `unidades_recursos` y `recursos_curso`; la FK compuesta
+    `(unidad_id, curso_id)` impide colgar un recurso de una unidad de otro curso.
+  - **Ocultar es real, no solo de pantalla:** la RLS de lectura solo devuelve al
+    estudiante inscrito unidades visibles y recursos visibles dentro de una unidad
+    visible. Por eso los archivos van en un **bucket aparte**, `recursos-curso`, cuya
+    policy de lectura exige que la fila de `recursos_curso` le sea visible. En
+    `materiales-actividades` cualquier inscrito puede leer toda la carpeta del curso,
+    y ahí un recurso oculto quedaría expuesto.
+  - El archivo se sube **directo del navegador** (no por Server Action: una
+    presentación pasa fácil el límite de ~4.5 MB de Vercel) a
+    `{curso_id}/{uuid}/{nombre}`, y después `registrarArchivoRecurso` crea la fila
+    (si falla, borra el archivo). `subirConReintentos` (`lib/subir-archivo.ts`) es el
+    mismo reintento ante cortes de red que usan las entregas de tareas.
+  - Se abren por `/recursos/[recursoId]` (`app/recursos/[recursoId]/route.ts`, docente y
+    estudiante): verifica con RLS, firma un enlace de 5 min en ese momento y redirige,
+    así la página no reparte enlaces que vencen mientras sigue abierta. DOCX y PPTX se
+    descargan con su nombre original pasado por `nombreDescarga` (sin acentos ni
+    símbolos): el SDK de Storage codifica dos veces el parámetro `download`, y un
+    acento llegaba al navegador como `%C3%B3`.
+  - Mostrar un recurso: `lib/item-recurso.tsx`, igual para ambos roles. Reglas y tipos:
+    `lib/recursos.ts`.
+
+  Con la séptima pestaña, la franja va en 2 filas (4 + 3) en celular y en una sola fila
+  desde `sm`.
 - **Modo revisión de entregas.** `/docente/actividades/[id]/revisar/[entregaId]`: una
   entrega a la vez, con el archivo a la vista y la calificación al lado (en celular,
   abajo). Se entra desde el botón "Calificar una por una (n sin calificar)" de la lista,
@@ -299,8 +331,11 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
 
   Las actividades se copian **ocultas y con sus fechas originales**: por decisión del
   docente, él ajusta la fecha de cada una al publicarla; no se recorren automáticamente.
-  No copia estudiantes, entregas, asistencia ni anuncios. Es todo o nada: si una
-  actividad falla, se borran el curso nuevo y los archivos ya copiados. Al terminar lleva
+  También copia las unidades y recursos del curso (`lib/duplicar-recursos.ts`), con sus
+  archivos copiados en `recursos-curso` y **con su misma visibilidad** (no tienen fechas
+  que ajustar). No copia estudiantes, entregas, asistencia ni anuncios. Es todo o nada:
+  si una actividad o un recurso falla, se borran el curso nuevo y los archivos ya
+  copiados. Al terminar lleva
   a la pestaña Tareas del curso nuevo. La copia de cada actividad vive en
   `lib/duplicar-actividad.ts` (`duplicarActividad`), compartida con "Copiar a otro curso"
   (`copiarActividad`). La clave de acceso se genera con `lib/clave-acceso.ts`,
@@ -554,6 +589,34 @@ create table anuncios (
 
 -- Agregada en 20261101150000_add_limite_tiempo_examen.sql (más
 -- actividades.limite_minutos smallint, null = sin límite, 1 a 600)
+-- Agregadas en 20261111120000_add_recursos_curso.sql (más el bucket privado
+-- recursos-curso: 25 MB, PDF/DOCX/PPTX/JPG/PNG)
+create table unidades_recursos (
+  id uuid primary key default gen_random_uuid(),
+  curso_id uuid not null references cursos(id) on delete cascade,
+  titulo text not null,  -- 1 a 200 caracteres
+  orden integer not null default 0,
+  visible boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (id, curso_id)
+);
+
+create table recursos_curso (
+  id uuid primary key default gen_random_uuid(),
+  curso_id uuid not null references cursos(id) on delete cascade,
+  unidad_id uuid not null,  -- FK (unidad_id, curso_id) -> unidades_recursos, cascade
+  titulo text not null,     -- 1 a 200 caracteres
+  descripcion text,         -- hasta 1000
+  tipo text not null check (tipo in ('ARCHIVO', 'ENLACE')),
+  url text,                 -- ENLACE, solo http(s)
+  nombre_archivo text,      -- ARCHIVO
+  storage_path text unique, -- ARCHIVO
+  tamano_bytes bigint,
+  orden integer not null default 0,
+  visible boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 create table intentos_examen (
   id uuid primary key default gen_random_uuid(),
   actividad_id uuid not null references actividades(id) on delete cascade,
@@ -582,6 +645,9 @@ create table intentos_examen (
   estudiante no tiene policy de lectura sobre estas tablas — su propia asistencia se calcula
   server-side con la secret key (ver "Lecturas protegidas" arriba), a propósito en vez de
   agregar una policy nueva.
+- `unidades_recursos` y `recursos_curso`: escribe solo el docente dueño; lee el docente
+  dueño o un inscrito, y este último solo lo visible (ver "Recursos del curso"). El
+  bucket `recursos-curso` aplica la misma regla a los archivos.
 - `preguntas_examen` sigue sin ninguna policy (inaccesible salvo secret key); la vista
   `preguntas_examen_estudiante` (sin la columna `correcta`) es lo único que un estudiante
   puede leer directamente para responder un examen.

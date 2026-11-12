@@ -7,7 +7,15 @@ import { obtenerResumenCursoEstudiante } from "@/lib/resumen-curso-estudiante";
 import { ordenarParaEstudiante } from "@/lib/preguntas-examen";
 import { dentroDelTiempo, type IntentoActivo } from "@/lib/intentos-examen";
 import { COLUMNAS_ANUNCIO, type Anuncio } from "@/lib/anuncios";
+import {
+  COLUMNAS_RECURSO,
+  COLUMNAS_UNIDAD,
+  agruparPorUnidad,
+  type Recurso,
+  type Unidad,
+} from "@/lib/recursos";
 import TablonAnuncios from "./tablon-anuncios";
+import RecursosCurso from "./recursos-curso";
 import TarjetaTareaEstudiante from "./tarjeta-tarea-estudiante";
 import TarjetaExamenEstudiante from "./tarjeta-examen-estudiante";
 
@@ -45,6 +53,18 @@ export default async function DetalleCursoEstudiante({
     .eq("curso_id", id)
     .order("fijado", { ascending: false })
     .order("created_at", { ascending: false })) as { data: Anuncio[] | null };
+
+  // RLS (unidades_recursos_select / recursos_curso_select) ya deja fuera las
+  // unidades y recursos ocultos, y los de cursos donde no está inscrito.
+  const [{ data: unidadesRecursos }, { data: recursos }] = await Promise.all([
+    supabase.from("unidades_recursos").select(COLUMNAS_UNIDAD).eq("curso_id", id) as unknown as Promise<{
+      data: Unidad[] | null;
+    }>,
+    supabase.from("recursos_curso").select(COLUMNAS_RECURSO).eq("curso_id", id) as unknown as Promise<{
+      data: Recurso[] | null;
+    }>,
+  ]);
+  const unidadesConRecursos = agruparPorUnidad(unidadesRecursos ?? [], recursos ?? []);
 
   // Intentos con tiempo que el estudiante tiene en curso (los vencidos ya
   // se entregaron en obtenerResumenCursoEstudiante). RLS: solo los suyos.
@@ -269,6 +289,8 @@ export default async function DetalleCursoEstudiante({
           </ul>
         )}
       </section>
+
+      <RecursosCurso unidades={unidadesConRecursos} />
     </main>
   );
 }
