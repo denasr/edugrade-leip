@@ -172,6 +172,13 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   (`formulario-entrega.tsx`) reintenta hasta 3 veces solo ante cortes de red, y trata
   "The resource already exists" como éxito, porque la ruta es única por entrega e índice
   y `crearEntrega` vacía la carpeta antes. Solo se reporta a Sentry si fallan los 3 intentos.
+- **Archivos leídos en memoria antes de entregar.** En Android, un archivo elegido desde
+  WhatsApp, Drive o Descargas a veces no se puede leer, y la subida falla al instante con
+  "Failed to fetch", igual que un corte de red: el OPTIONS llega a Storage y el POST no, y
+  los 3 reintentos fallan en segundos (20-nov-2026, PDF de 745 KB). `formulario-entrega.tsx`
+  lee cada archivo con `arrayBuffer()` **antes** de `crearEntrega`. Si no puede, le pide al
+  estudiante abrir o guardar el archivo y volver a elegirlo, y lo reporta a Sentry
+  (`etapa: leer-archivo`). Si sí puede, sube esa copia en memoria.
 - **Fotos reducidas antes de subirse.** `comprimirImagen` (`lib/comprimir-imagen.ts`),
   llamada por `formulario-entrega.tsx` **antes** de validar el tamaño: JPG de más de
   600 KB y PNG de más de 1.5 MB pasan a JPEG de 2000 px de lado mayor y calidad 0.82

@@ -131,6 +131,37 @@ export default function FormularioEntrega({
       archivos.push(await comprimirImagen(original));
     }
 
+    // En Android, un archivo elegido desde WhatsApp, Drive o el gestor de
+    // descargas a veces no se puede leer (no está descargado en el teléfono
+    // o el permiso ya caducó). El navegador no avisa al elegirlo: la subida
+    // falla al instante con "Failed to fetch", igual que un corte de red,
+    // y reintentar no sirve (pasó así el 20-nov-2026 con un PDF de 745 KB).
+    // Leerlo aquí, antes de registrar la entrega, separa ese caso y deja
+    // subir una copia en memoria que ya no depende del archivo de origen.
+    for (let i = 0; i < archivos.length; i++) {
+      try {
+        const datos = await archivos[i].arrayBuffer();
+        archivos[i] = new File([datos], archivos[i].name, {
+          type: archivos[i].type,
+          lastModified: archivos[i].lastModified,
+        });
+      } catch (errorLectura) {
+        Sentry.captureException(errorLectura, {
+          tags: { flujo: "entrega-tarea", etapa: "leer-archivo" },
+          extra: {
+            tamanoBytes: archivos[i].size,
+            extension: archivos[i].name.split(".").pop()?.toLowerCase(),
+          },
+        });
+        setError(
+          `Tu teléfono no dejó leer "${archivos[i].name}". Si lo elegiste desde WhatsApp, Drive o Descargas, ábrelo primero ahí (o guárdalo en tu teléfono) y vuelve a elegirlo.`
+        );
+        setPending(false);
+        setProgreso(null);
+        return;
+      }
+    }
+
     const errorValidacion = validarArchivos(archivos);
     if (errorValidacion) {
       setError(errorValidacion);
