@@ -10,6 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { nombreArchivoSeguro } from "@/lib/nombre-archivo";
 import { subirConReintentos } from "@/lib/subir-archivo";
+import { comprimirImagen } from "@/lib/comprimir-imagen";
 import { useToast } from "../../../toast-provider";
 
 // Tipo de archivo por extensión, no por `archivo.type`: ese dato lo pone el
@@ -75,7 +76,7 @@ export default function FormularioEntrega({
   const [progreso, setProgreso] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  function validarArchivos(archivos: FileList): string | null {
+  function validarArchivos(archivos: File[]): string | null {
     if (archivos.length === 0) {
       return "Adjunta al menos un archivo para entregar la tarea.";
     }
@@ -107,12 +108,9 @@ export default function FormularioEntrega({
     if (!form) return;
 
     const input = form.elements.namedItem("archivos") as HTMLInputElement | null;
-    const archivos = input?.files;
-    if (!archivos) return;
-
-    const errorValidacion = validarArchivos(archivos);
-    if (errorValidacion) {
-      setError(errorValidacion);
+    const originales = Array.from(input?.files ?? []);
+    if (originales.length === 0 || originales.length > MAXIMO_ARCHIVOS) {
+      setError(validarArchivos(originales));
       return;
     }
 
@@ -123,6 +121,24 @@ export default function FormularioEntrega({
 
     setError(null);
     setPending(true);
+
+    // Las fotos se reducen antes de validar el tamaño: así una foto de
+    // 12 MB que antes se rechazaba ahora entra. Una por una (no en
+    // paralelo) para no agotar la memoria de un celular modesto.
+    setProgreso("Preparando archivos…");
+    const archivos: File[] = [];
+    for (const original of originales) {
+      archivos.push(await comprimirImagen(original));
+    }
+
+    const errorValidacion = validarArchivos(archivos);
+    if (errorValidacion) {
+      setError(errorValidacion);
+      setPending(false);
+      setProgreso(null);
+      return;
+    }
+
     setProgreso("Registrando entrega…");
 
     const resultadoEntrega = await crearEntrega(actividadId, comentario);

@@ -126,21 +126,10 @@ export default async function DetalleCursoEstudiante({
       const material = actividad.esCuestionario
         ? null
         : (actividad.materiales_actividad[0] ?? null);
-      let enlaceDescarga: string | null = null;
-
-      if (material) {
-        // No debe tronar toda la página si Storage falla (red, timeout):
-        // sin enlace de descarga es degradación aceptable, un 500 no.
-        try {
-          const { data, error } = await supabase.storage
-            .from("materiales-actividades")
-            .createSignedUrl(material.storage_path, 60 * 10);
-          if (error) console.error("Error al firmar URL de material:", error);
-          enlaceDescarga = data?.signedUrl ?? null;
-        } catch (err) {
-          console.error("Excepción al firmar URL de material:", err);
-        }
-      }
+      // El enlace se firma al hacer clic (/material/[id]), no al cargar la
+      // página: antes se firmaba aquí por 10 minutos y, si el estudiante
+      // dejaba la página abierta, el clic llevaba a un error de Storage.
+      const enlaceDescarga = material ? `/material/${material.id}` : null;
 
       return {
         ...actividad,

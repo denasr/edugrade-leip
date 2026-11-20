@@ -206,6 +206,124 @@ test.describe("Entrega de tarea con archivo", () => {
     await expect(tarjeta.getByText("Entregaste: Mi tarea (final).docx")).toBeVisible();
   });
 
+  test("una foto grande se reduce en el navegador antes de subirse", async ({ page }) => {
+    // Auditoría del 17-nov-2026: el 88 % del Storage eran fotos de celular
+    // de ~2.5 MB y el plan gratuito (1 GB) se llenaba en enero. Además, una
+    // foto de más de 10 MB antes se rechazaba y ahora debe entrar reducida.
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: actividad } = await admin
+      .from("actividades")
+      .insert({
+        curso_id: cursoId,
+        titulo: "Tarea E2E foto grande",
+        tipo: "TAREA",
+        fecha_cierre: "2099-12-31T23:59:00Z",
+      })
+      .select("id")
+      .single();
+
+    await iniciarSesion(page, estudiante.email, estudiante.password);
+    await page.goto(`/estudiante/cursos/${cursoId}`);
+
+    // Una foto "de verdad" (ruido, que comprime mal) de 4000x3000 generada
+    // en el propio navegador, con calidad alta para que pese varios MB.
+    const base64 = await page.evaluate(async () => {
+      const lienzo = document.createElement("canvas");
+      lienzo.width = 4000;
+      lienzo.height = 3000;
+      const ctx = lienzo.getContext("2d")!;
+      const datos = ctx.createImageData(4000, 3000);
+      for (let i = 0; i < datos.data.length; i++) datos.data[i] = (i * 2654435761) % 256;
+      ctx.putImageData(datos, 0, 0);
+      return lienzo.toDataURL("image/jpeg", 0.98).split(",")[1];
+    });
+    const original = Buffer.from(base64, "base64");
+    expect(original.length).toBeGreaterThan(2 * 1024 * 1024);
+
+    const tarjeta = page.locator("li", { hasText: "Tarea E2E foto grande" });
+    await tarjeta.locator('input[name="archivos"]').setInputFiles({
+      name: "IMG_1234.jpg",
+      mimeType: "image/jpeg",
+      buffer: original,
+    });
+    await tarjeta.getByRole("button", { name: "Entregar tarea" }).click();
+    await expect(tarjeta.getByText("Entregaste: IMG_1234.jpg")).toBeVisible({ timeout: 60_000 });
+
+    const { data: entrega } = await admin
+      .from("entregas")
+      .select("archivos_entrega(storage_path, tamano_bytes)")
+      .eq("actividad_id", actividad!.id)
+      .single();
+    const guardado = entrega!.archivos_entrega[0];
+    expect(guardado.tamano_bytes).toBeLessThan(original.length / 2);
+    const { data: archivo } = await admin.storage.from("archivos-entrega").download(guardado.storage_path);
+    expect(archivo!.size).toBe(guardado.tamano_bytes);
+  });
+
+  test("el material de apoyo se abre con un enlace firmado al momento, solo para el curso", async ({
+    page,
+    browser,
+  }) => {
+    // Antes la página firmaba el enlace al cargarse por 10 minutos y, si el
+    // estudiante la dejaba abierta, el clic daba error (visto en los logs).
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: actividad } = await admin
+      .from("actividades")
+      .insert({
+        curso_id: cursoId,
+        titulo: "Tarea E2E con material",
+        tipo: "TAREA",
+        fecha_cierre: "2099-12-31T23:59:00Z",
+      })
+      .select("id")
+      .single();
+    const ruta = `${cursoId}/${actividad!.id}/guia.docx`;
+    await admin.storage.from("materiales-actividades").upload(ruta, Buffer.from("PK guia"), {
+      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    const { data: material } = await admin
+      .from("materiales_actividad")
+      .insert({ actividad_id: actividad!.id, nombre_archivo: "Guía (unidad 1).docx", storage_path: ruta })
+      .select("id")
+      .single();
+
+    try {
+      await iniciarSesion(page, estudiante.email, estudiante.password);
+      await page.goto(`/estudiante/cursos/${cursoId}`);
+      const enlace = page
+        .locator("li", { hasText: "Tarea E2E con material" })
+        .getByRole("link", { name: /Descargar Guía \(unidad 1\)\.docx/ });
+      await expect(enlace).toHaveAttribute("href", `/material/${material!.id}`);
+
+      const resp = await page.request.get(`/material/${material!.id}`, { maxRedirects: 0 });
+      expect(resp.status()).toBe(307);
+      const descarga = await page.request.get(resp.headers()["location"]);
+      expect(descarga.status()).toBe(200);
+      expect(descarga.headers()["content-disposition"]).toContain('filename="Guia unidad 1.docx"');
+
+      // Alguien sin acceso al curso no lo puede abrir.
+      const ajeno = await crearCuenta("ESTUDIANTE", "material-ajeno");
+      try {
+        const pAjeno = await (await browser.newContext()).newPage();
+        await iniciarSesion(pAjeno, ajeno.email, ajeno.password);
+        const respAjeno = await pAjeno.request.get(`/material/${material!.id}`, { maxRedirects: 0 });
+        expect(respAjeno.status()).toBe(404);
+      } finally {
+        await borrarCuenta(ajeno.id);
+      }
+    } finally {
+      await admin.storage.from("materiales-actividades").remove([ruta]);
+    }
+  });
+
   test("si la conexión se corta a mitad de la subida, se reintenta sola y la entrega se completa", async ({
     page,
   }) => {

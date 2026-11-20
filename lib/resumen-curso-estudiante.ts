@@ -44,7 +44,7 @@ type TareaCruda = {
   visible_estudiantes: boolean;
   orden_aleatorio: boolean;
   limite_minutos: number | null;
-  materiales_actividad: { nombre_archivo: string; storage_path: string }[];
+  materiales_actividad: { id: string; nombre_archivo: string; storage_path: string }[];
 };
 
 type ExamenCrudo = {
@@ -128,7 +128,7 @@ export async function obtenerResumenCursoEstudiante(
   const { data: tareasCrudas } = (await supabase
     .from("actividades")
     .select(
-      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, orden_aleatorio, limite_minutos, materiales_actividad(nombre_archivo, storage_path)"
+      "id, titulo, instrucciones, fecha_apertura, fecha_cierre, bloqueado_manual, visible_estudiantes, orden_aleatorio, limite_minutos, materiales_actividad(id, nombre_archivo, storage_path)"
     )
     .eq("curso_id", cursoId)
     .eq("tipo", "TAREA")

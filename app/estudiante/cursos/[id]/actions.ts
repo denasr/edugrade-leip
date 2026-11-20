@@ -191,10 +191,10 @@ export async function confirmarArchivosEntrega(
     );
 
     if (errorArchivo) {
-      await supabase.storage
-        .from("archivos-entrega")
-        .remove(archivos.map((a) => a.storagePath));
-      await borrarEntregaDeLimpieza(entregaId);
+      // cancelarEntrega (no borrarEntregaDeLimpieza directo): verifica que
+      // la entrega sea de este estudiante antes de usar la secret key. El
+      // entregaId llega del navegador y podría ser de otro.
+      await cancelarEntrega(entregaId);
       return { error: errorArchivo.message };
     }
 
@@ -217,9 +217,28 @@ export async function confirmarArchivosEntrega(
 // que hayan alcanzado a subirse bajo esta entrega en vez de recibir la
 // lista del cliente, para cubrir también el caso en que la conexión se
 // cortó antes de que el navegador pudiera avisar cuáles subió.
+//
+// Es una Server Action, o sea un endpoint que cualquiera con sesión puede
+// llamar con el id que quiera: antes de usar la secret key se verifica con
+// RLS que la entrega es del propio estudiante y que de verdad quedó a medias
+// (sin archivos registrados ni calificación). Sin esto, conocer el id de una
+// entrega ajena bastaba para borrarla con todo y su calificación.
 export async function cancelarEntrega(entregaId: string): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: entrega } = await supabase
+    .from("entregas")
+    .select("id, archivos_entrega(id), evaluaciones(id)")
+    .eq("id", entregaId)
+    .eq("estudiante_id", user.id)
+    .maybeSingle();
+  if (!entrega || entrega.archivos_entrega.length > 0 || entrega.evaluaciones) return;
+
   try {
-    const supabase = await createClient();
     const { data: archivos } = await supabase.storage
       .from("archivos-entrega")
       .list(entregaId);

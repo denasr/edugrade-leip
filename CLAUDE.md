@@ -172,6 +172,29 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   (`formulario-entrega.tsx`) reintenta hasta 3 veces solo ante cortes de red, y trata
   "The resource already exists" como éxito, porque la ruta es única por entrega e índice
   y `crearEntrega` vacía la carpeta antes. Solo se reporta a Sentry si fallan los 3 intentos.
+- **Fotos reducidas antes de subirse.** `comprimirImagen` (`lib/comprimir-imagen.ts`),
+  llamada por `formulario-entrega.tsx` **antes** de validar el tamaño: JPG de más de
+  600 KB y PNG de más de 1.5 MB pasan a JPEG de 2000 px de lado mayor y calidad 0.82
+  (respetando la orientación EXIF; un PNG convertido cambia su nombre a `.jpg`). HEIC
+  no se toca (solo Safari lo decodifica). Si algo falla o el resultado pesa más, sube el
+  original: nunca bloquea una entrega. Motivo: en la auditoría del 17-nov-2026 el 88 % de
+  Storage eran fotos de ~2.5 MB, el proyecto está en el **plan gratuito (1 GB)** y a ese
+  ritmo (~11 MB diarios) se llenaba hacia el 8-ene-2027. Lleno, ninguna subida entra.
+  Los archivos ya subidos no se tocaron.
+- **Material de apoyo por `/material/[materialId]`.** Mismo patrón que
+  `/recursos/[recursoId]`: verifica con RLS (`materiales_select`), firma un enlace de
+  5 min al hacer clic y redirige; DOCX se descarga con `nombreDescarga`. Antes la página
+  del curso del estudiante firmaba el enlace al cargarse, por 10 minutos, y si la
+  dejaba abierta el clic terminaba en un error de Storage.
+- **Limpieza de entregas solo sobre la propia.** `cancelarEntrega` usa la secret key,
+  pero antes verifica con RLS que la entrega sea del estudiante y siga a medias (sin
+  archivos registrados ni calificación); `confirmarArchivosEntrega` también pasa por
+  ella. Antes borraban por id sin verificar: como son Server Actions (endpoints que
+  cualquiera con sesión puede llamar), conocer el id de una entrega ajena bastaba para
+  borrarla con todo y su calificación. La migración `20261118120000` además le quita al
+  estudiante el borrado de archivos ya confirmados (policy `archivos_entrega_delete_propio`
+  eliminada; `storage_entregas_delete` solo para archivos sin fila en
+  `archivos_entrega`).
 - **Recuperar contraseña.** `/recuperar` pide el enlace con un cliente aparte de flujo
   `implicit`, no con el cliente PKCE de `@supabase/ssr`. Con PKCE el enlace solo se podía
   canjear en el mismo navegador donde se pidió (el `code_verifier` vive en una cookie), y
