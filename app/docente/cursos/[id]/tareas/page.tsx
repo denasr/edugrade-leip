@@ -5,6 +5,7 @@ import { finalizarIntentosVencidos } from "@/lib/intentos-examen";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { compararPorCierre } from "@/lib/actividades";
 import { leerTodasLasFilas } from "@/lib/leer-todas-las-filas";
+import { calcularFaltantes } from "@/lib/faltantes-tarea";
 import EncabezadoCurso from "../encabezado-curso";
 import FranjaPestanas from "../franja-pestanas";
 import FormularioActividad from "../formulario-actividad";
@@ -89,7 +90,9 @@ export default async function TareasCurso({
 
   type EntregaConEvaluacion = {
     actividad_id: string;
+    estudiante_id: string;
     estado: string;
+    archivos_entrega: { count: number }[];
     evaluaciones: { calificacion_final: number } | null;
   };
 
@@ -100,7 +103,9 @@ export default async function TareasCurso({
       ? await leerTodasLasFilas<EntregaConEvaluacion>((desde, hasta) =>
           supabase
             .from("entregas")
-            .select("actividad_id, estado, evaluaciones(calificacion_final)")
+            .select(
+              "actividad_id, estudiante_id, estado, archivos_entrega(count), evaluaciones(calificacion_final)"
+            )
             .in("actividad_id", actividadIds)
             .order("id", { ascending: true })
             .range(desde, hasta)
@@ -151,6 +156,37 @@ export default async function TareasCurso({
       (suma, s) => suma + (s.presentados - s.conCalif),
       0
     );
+
+  // "Ver quién no ha entregado (n)" en cada tarjeta: mismo cálculo que la
+  // vista /docente/actividades/[id]/faltantes (lib/faltantes-tarea.ts).
+  // Un curso no pasa de unas decenas de inscritos, lejos de las 1000 filas.
+  const { data: inscripciones } = await supabase
+    .from("inscripciones")
+    .select("estudiante_id")
+    .eq("curso_id", id);
+  const estudianteIds = (inscripciones ?? []).map((i) => i.estudiante_id);
+  const entregasPorActividad = new Map<string, EntregaConEvaluacion[]>();
+  for (const entrega of entregas) {
+    const actual = entregasPorActividad.get(entrega.actividad_id) ?? [];
+    actual.push(entrega);
+    entregasPorActividad.set(entrega.actividad_id, actual);
+  }
+  const faltantesPorActividad = new Map<string, number>();
+  for (const actividadId of actividadIds) {
+    const faltantes = calcularFaltantes(
+      estudianteIds,
+      (entregasPorActividad.get(actividadId) ?? []).map((e) => ({
+        estudiante_id: e.estudiante_id,
+        numArchivos: e.archivos_entrega[0]?.count ?? 0,
+        calificada: e.evaluaciones !== null,
+      })),
+      idsCuestionarios.has(actividadId)
+    );
+    faltantesPorActividad.set(actividadId, faltantes.length);
+  }
+  // null = no hay inscritos: las tarjetas no muestran el enlace.
+  const faltantesDe = (actividadId: string) =>
+    estudianteIds.length > 0 ? (faltantesPorActividad.get(actividadId) ?? 0) : null;
 
   // Precarga las preguntas (con `correcta`) de cada cuestionario para su
   // formulario de edición — mismo patrón que ya usa la pestaña Exámenes.
@@ -222,6 +258,7 @@ export default async function TareasCurso({
                     }
                     preguntas={preguntasPorActividad.get(actividad.id) ?? []}
                     otrosCursos={otrosCursos ?? []}
+                    faltantes={faltantesDe(actividad.id)}
                   />
                 ) : (
                   <TarjetaTarea
@@ -235,6 +272,7 @@ export default async function TareasCurso({
                       }
                     }
                     otrosCursos={otrosCursos ?? []}
+                    faltantes={faltantesDe(actividad.id)}
                   />
                 )
               )}

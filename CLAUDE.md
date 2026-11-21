@@ -443,6 +443,18 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   - RLS: `intentos_examen` solo tiene policy de lectura (el estudiante los suyos, el
     docente los de sus actividades); toda escritura va con la secret key tras verificar
     con RLS. Se copia `limite_minutos` al duplicar o copiar la actividad.
+- **Quién no ha entregado una tarea.** `/docente/actividades/[id]/faltantes`: conteo
+  ("n de m estudiantes sin entregar") y lista de nombres de los inscritos sin entrega,
+  en orden alfabético. Se entra desde el enlace "n sin entregar · ver quiénes" (o
+  "Todos han entregado") de cada tarjeta de la pestaña Tareas; en un cuestionario dice
+  "presentar". No aparece si el curso no tiene inscritos. El criterio vive en
+  `lib/faltantes-tarea.ts` (`calcularFaltantes`), compartido por la tarjeta y la vista
+  para que el número no difiera: una entrega de tarea a medias (sin archivos ni
+  calificación) cuenta como no entregada y se marca "Entrega incompleta", igual que
+  `tieneEntregaReal`; en un cuestionario basta con que exista la entrega (antes se
+  corre `finalizarIntentosVencidos`). Quien se inscribió después del cierre sigue
+  contando como faltante (el libro también dice "Sin entregar"), pero se marca "Se
+  inscribió tras el cierre".
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
