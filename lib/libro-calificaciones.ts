@@ -7,6 +7,7 @@ import {
   calcularCalificacionFinal,
   calcularPorcentajeAsistencia,
   promedioCalificaciones,
+  type PesosCurso,
   type ResultadoCalificacionFinal,
 } from "@/lib/calificacion-final";
 
@@ -23,7 +24,13 @@ export type FilaEstudiante = {
 };
 
 export type LibroCalificaciones = {
-  curso: { id: string; nombre: string; grupo: string; periodo: string };
+  curso: {
+    id: string;
+    nombre: string;
+    grupo: string;
+    periodo: string;
+    pesos: PesosCurso;
+  };
   tareas: ActividadLibro[];
   examenes: ActividadLibro[];
   estudiantes: FilaEstudiante[];
@@ -227,6 +234,12 @@ export async function obtenerLibroCalificaciones(
       nombre: curso.nombre,
       grupo: curso.grupo,
       periodo: curso.periodo,
+      // Solo para mostrar la base del cálculo en el resumen del grupo.
+      pesos: {
+        porcentaje_tareas: curso.porcentaje_tareas,
+        porcentaje_examenes: curso.porcentaje_examenes,
+        porcentaje_asistencia: curso.porcentaje_asistencia,
+      },
     },
     tareas: tareas ?? [],
     examenes: examenes ?? [],

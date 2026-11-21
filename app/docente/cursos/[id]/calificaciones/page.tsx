@@ -8,6 +8,8 @@ import {
   textoCeldaExamen,
   textoCeldaTarea,
 } from "@/lib/libro-calificaciones";
+import { resumirGrupo } from "@/lib/resumen-grupo";
+import { ResumenGrupoLibro } from "./resumen-grupo";
 
 export default async function LibroCalificaciones({
   params,
@@ -34,6 +36,8 @@ export default async function LibroCalificaciones({
   if (!libro) redirect("/docente");
 
   const { curso, tareas, examenes, estudiantes } = libro;
+  // Agrega la columna "Final" ya calculada; no recalcula ninguna nota.
+  const resumen = resumirGrupo(estudiantes);
 
   return (
     <main className="flex flex-1 flex-col items-center gap-8 px-4 py-16">
@@ -48,6 +52,8 @@ export default async function LibroCalificaciones({
           {curso.grupo} · {curso.periodo}
         </p>
       </div>
+
+      <ResumenGrupoLibro resumen={resumen} pesos={curso.pesos} />
 
       {estudiantes.length === 0 ? (
         <p className="text-sm text-ink/70">
