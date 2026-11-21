@@ -8,6 +8,7 @@ import { IconoArchivo } from "@/lib/icono-archivo";
 import FormularioActividad from "./formulario-actividad";
 import FormularioCopiarActividad from "./formulario-copiar-actividad";
 import BotonEliminarActividad from "./boton-eliminar-actividad";
+import EnlaceFaltantes from "./enlace-faltantes";
 import { alternarBloqueo, alternarVisibilidad, eliminarActividad } from "./actions";
 
 type Actividad = {
@@ -28,6 +29,7 @@ export default function TarjetaTarea({
   cursoId,
   conteo,
   otrosCursos,
+  faltantes = null,
 }: {
   actividad: Actividad;
   cursoId: string;
@@ -35,6 +37,9 @@ export default function TarjetaTarea({
   // Cursos propios del docente aparte de este — [] si solo tiene uno. Sin
   // esto no habría a dónde copiar, así que el botón "Copiar" ni se muestra.
   otrosCursos: CursoOpcion[];
+  // Inscritos sin entrega real (ver lib/faltantes-tarea.ts); null si el
+  // curso no tiene inscritos.
+  faltantes?: number | null;
 }) {
   const estado = estadoActividad(actividad);
   const [editando, setEditando] = useState(false);
@@ -161,6 +166,12 @@ export default function TarjetaTarea({
       >
         {conteo.total} entregas · {conteo.pendientes} pendientes
       </Link>
+
+      <EnlaceFaltantes
+        actividadId={actividad.id}
+        faltantes={faltantes}
+        verbo="entregado"
+      />
 
       {actividad.instrucciones && (
         <p className="mt-1 whitespace-pre-wrap text-sm text-ink/70">

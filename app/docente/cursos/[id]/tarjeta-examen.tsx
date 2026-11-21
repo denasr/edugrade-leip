@@ -7,6 +7,7 @@ import { estadoActividad, textoRelativoCierre } from "@/lib/actividades";
 import FormularioCrearExamen from "./formulario-crear-examen";
 import FormularioCopiarActividad from "./formulario-copiar-actividad";
 import BotonEliminarActividad from "./boton-eliminar-actividad";
+import EnlaceFaltantes from "./enlace-faltantes";
 import { alternarBloqueo, alternarVisibilidad, eliminarActividad } from "./actions";
 
 type Examen = {
@@ -43,6 +44,7 @@ export default function TarjetaExamen({
   preguntas,
   tipo = "EXAMEN",
   otrosCursos = [],
+  faltantes = null,
 }: {
   examen: Examen;
   cursoId: string;
@@ -55,6 +57,9 @@ export default function TarjetaExamen({
   // Cursos propios del docente aparte de este — [] si solo tiene uno. Sin
   // esto no habría a dónde copiar, así que el botón "Copiar" ni se muestra.
   otrosCursos?: CursoOpcion[];
+  // Solo lo pasa la pestaña Tareas (cuestionarios): inscritos que no lo han
+  // presentado (ver lib/faltantes-tarea.ts). null = no mostrar el enlace.
+  faltantes?: number | null;
 }) {
   const estado = estadoActividad(examen);
   const [editando, setEditando] = useState(false);
@@ -190,6 +195,12 @@ export default function TarjetaExamen({
       <p className="mt-1 text-xs text-ink/70">
         {stats.presentados} presentados · promedio {promedio}/10
       </p>
+
+      <EnlaceFaltantes
+        actividadId={examen.id}
+        faltantes={faltantes}
+        verbo="presentado"
+      />
 
       {tieneAbiertas && (
         <Link
