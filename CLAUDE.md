@@ -130,6 +130,19 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `.xlsx` no puede reproducir el color aparte que usa la pantalla. Nombre del archivo:
   `calificaciones-{slug-del-curso}-{fecha-de-hoy}.xlsx`, con el slug sin acentos ni
   caracteres especiales para que el header `Content-Disposition` no tenga problemas.
+- **Resumen de aprovechamiento del grupo.** Tarjeta "Resumen del grupo" arriba de la tabla
+  del libro de calificaciones: promedio del grupo y cuántos estudiantes tienen calificación
+  final menor a 6 (con "Ver quiénes", con 2 decimales). `resumirGrupo`
+  (`lib/resumen-grupo.ts`) **no calcula ninguna nota**: solo agrega el `resultado` que
+  `obtenerLibroCalificaciones` ya calculó para cada fila, así nunca contradice la columna
+  "Final". Reglas, explicadas también en la tarjeta: promedio simple por estudiante; quien
+  no tiene calificación final ("Sin datos") se excluye del promedio y del conteo, nunca
+  cuenta como 0; las parciales sí entran y se cuentan aparte; "menor a 6" es estricto y se
+  compara con el valor de 2 decimales (un 5.96 se ve "6.0/10" en la tabla y sí cuenta);
+  grupo vacío o sin ninguna nota → "Sin datos". Cuenta cuentas inscritas, no personas: un
+  alumno con dos cuentas cuenta dos veces. No va en la exportación a Excel. Pruebas
+  unitarias con datos sintéticos en `tests/unit/` (`npm test`, test runner de Node, sin
+  Supabase); por eso `tsconfig.json` tiene `allowImportingTsExtensions`.
 - **Eliminar una sesión de asistencia.** Botón "Eliminar" junto a cada fecha ya tomada en
   `/docente/cursos/[id]` (sección Asistencia), con `confirm()` nativo — mismo patrón que
   `BotonEliminarActividad`. Borra la fila de `sesiones_asistencia`; el `on delete cascade`
