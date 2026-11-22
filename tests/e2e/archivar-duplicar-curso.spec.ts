@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
@@ -148,9 +148,12 @@ test.describe("Archivar y duplicar cursos", () => {
     const archivados = page.locator("details").filter({ hasText: "Cursos archivados" });
     await expect(archivados.locator("summary")).toBeVisible();
     // Plegado: el curso no se ve hasta abrir la sección.
-    await expect(page.getByRole("link", { name: new RegExp(claveAcceso) })).toBeHidden();
+    // La tarjeta del curso se reconoce por su clave de acceso.
+    const tarjeta = (zona: Page | Locator) =>
+      zona.getByRole("listitem").filter({ hasText: claveAcceso });
+    await expect(tarjeta(page)).toBeHidden();
     await archivados.locator("summary").click();
-    await expect(archivados.getByRole("link", { name: new RegExp(claveAcceso) })).toBeVisible();
+    await expect(tarjeta(archivados)).toBeVisible();
 
     // Un estudiante nuevo ya no puede inscribirse con la clave.
     const nuevo = await crearCuenta("ESTUDIANTE", "duplicar-tarde");
@@ -168,11 +171,11 @@ test.describe("Archivar y duplicar cursos", () => {
     }
 
     // Desarchivar lo regresa a la lista principal.
-    await archivados.getByRole("link", { name: new RegExp(claveAcceso) }).click();
+    await tarjeta(archivados).getByRole("link", { name: "Abrir curso" }).click();
     await page.waitForLoadState("networkidle");
     await page.getByRole("button", { name: /Desarchivar curso/ }).click();
     await expect(page.getByText(/Curso archivado el/)).toBeHidden();
     await page.goto("/docente");
-    await expect(page.getByRole("link", { name: new RegExp(claveAcceso) })).toBeVisible();
+    await expect(tarjeta(page)).toBeVisible();
   });
 });

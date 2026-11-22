@@ -4,6 +4,18 @@ import { createClient } from "@/lib/supabase/server";
 import { contarPendientesCurso } from "@/lib/pendientes-docente";
 import FormularioCurso from "./formulario-curso";
 
+type CursoTarjeta = {
+  id: string;
+  nombre: string;
+  grupo: string;
+  periodo: string;
+  clave_acceso: string;
+  inscripciones: { count: number }[];
+  actividades: { count: number }[];
+  // Solo en cursos activos: los archivados no cuentan para "por calificar".
+  pendientes?: { tareas: number; examenes: number; total: number };
+};
+
 export default async function PanelDocente() {
   const supabase = await createClient();
   const {
@@ -14,7 +26,7 @@ export default async function PanelDocente() {
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("rol, nombre_completo")
+    .select("rol")
     .eq("id", user.id)
     .single();
 
@@ -22,145 +34,165 @@ export default async function PanelDocente() {
 
   const { data: cursos } = await supabase
     .from("cursos")
-    .select("id, nombre, grupo, periodo, clave_acceso, archivado_at, inscripciones(count)")
+    .select(
+      "id, nombre, grupo, periodo, clave_acceso, archivado_at, inscripciones(count), actividades(count)"
+    )
     .eq("docente_id", user.id)
     .order("created_at", { ascending: false });
 
-  // Los archivados salen de la lista principal y de "Por calificar"; se ven
-  // aparte, plegados, al final del panel.
-  const cursosActivos = (cursos ?? []).filter((c) => !c.archivado_at);
+  // Los archivados salen de la lista principal y del conteo de pendientes;
+  // se ven aparte, plegados, al final del panel.
   const cursosArchivados = (cursos ?? []).filter((c) => c.archivado_at);
 
-  // Mismo conteo que ya usa el badge de la franja de pestañas dentro de
-  // cada curso (contarPendientesCurso, en lib/pendientes-docente.ts)
-  // — aquí se corre para todos los cursos del docente a la vez, para no
-  // tener que entrar uno por uno a ver dónde hay entregas sin calificar.
-  const cursosConPendientes = (
-    await Promise.all(
-      cursosActivos.map(async (curso) => ({
-        ...curso,
-        ...(await contarPendientesCurso(supabase, curso.id)),
-      }))
-    )
-  ).map((curso) => ({ ...curso, pendientes: curso.tareas + curso.examenes }));
-  const cursosPendientesOrdenados = cursosConPendientes
-    .filter((c) => c.pendientes > 0)
-    .sort((a, b) => b.pendientes - a.pendientes);
-  const totalPendientes = cursosPendientesOrdenados.reduce(
-    (suma, c) => suma + c.pendientes,
-    0
+  // Mismo conteo que el número de la franja de pestañas dentro de cada curso
+  // (contarPendientesCurso, en lib/pendientes-docente.ts), corrido para todos
+  // los cursos activos a la vez: cada tarjeta muestra cuántas entregas
+  // esperan calificación sin tener que entrar al curso.
+  const cursosActivos: CursoTarjeta[] = await Promise.all(
+    (cursos ?? [])
+      .filter((c) => !c.archivado_at)
+      .map(async (curso) => {
+        const { tareas, examenes } = await contarPendientesCurso(supabase, curso.id);
+        return { ...curso, pendientes: { tareas, examenes, total: tareas + examenes } };
+      })
   );
 
+  const totalPendientes = cursosActivos.reduce(
+    (suma, c) => suma + (c.pendientes?.total ?? 0),
+    0
+  );
+  const cursosConPendientes = cursosActivos.filter(
+    (c) => (c.pendientes?.total ?? 0) > 0
+  ).length;
+
   return (
-    <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
-      <div className="text-center">
-        <h1 className="font-title text-2xl text-verde-bosque">
-          Panel del docente
-        </h1>
-        <p className="mt-2 text-sm text-ink/70">
-          Bienvenido, {perfil.nombre_completo}.
-        </p>
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-10 text-[17px] sm:px-8 sm:py-14 sm:text-lg">
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div className="flex min-w-0 flex-col gap-2.5">
+          <h1 className="font-title text-4xl font-semibold leading-tight text-verde-bosque sm:text-5xl">
+            Tus cursos
+          </h1>
+          {cursosActivos.length > 0 && (
+            <p className="text-lg text-ink/80 sm:text-xl">
+              {totalPendientes === 0
+                ? "No tienes entregas por calificar."
+                : `Tienes ${totalPendientes} ${totalPendientes === 1 ? "entrega" : "entregas"} por calificar en ${cursosConPendientes} ${cursosConPendientes === 1 ? "curso" : "cursos"}.`}
+            </p>
+          )}
+        </div>
+        <FormularioCurso />
       </div>
 
-      <FormularioCurso />
-
-      {cursosActivos.length > 0 && (
-        <section className="w-full max-w-sm lg:max-w-4xl">
-          <h2 className="font-title text-xl text-verde-bosque">
-            Por calificar
-          </h2>
-          {totalPendientes === 0 ? (
-            <p className="mt-4 text-sm text-ink/70">
-              No tienes entregas pendientes de calificar.
-            </p>
-          ) : (
-            <ul className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
-              {cursosPendientesOrdenados.map((curso) => (
-                <li
-                  key={curso.id}
-                  className="card p-4 transition-shadow hover:shadow-md"
-                >
-                  <Link
-                    href={`/docente/cursos/${curso.id}/${curso.tareas > 0 ? "tareas" : "examenes"}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-ink">
-                          {curso.nombre}
-                        </p>
-                        <p className="text-sm text-ink/70">
-                          {curso.grupo} · {curso.periodo}
-                        </p>
-                      </div>
-                      <span className="badge-pendiente shrink-0">
-                        {curso.pendientes}{" "}
-                        {curso.pendientes === 1 ? "pendiente" : "pendientes"}
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      {cursosActivos.length === 0 ? (
+        <p className="text-ink/75">
+          {cursosArchivados.length > 0
+            ? "No tienes cursos activos. Crea uno nuevo o abre uno archivado."
+            : "Todavía no has creado ningún curso. Usa “+ Nuevo curso” para empezar."}
+        </p>
+      ) : (
+        <ListaCursos cursos={cursosActivos} />
       )}
 
-      <section className="w-full max-w-sm lg:max-w-4xl">
-        <h2 className="font-title text-xl text-verde-bosque">Mis cursos</h2>
-
-        {cursosActivos.length === 0 ? (
-          <p className="mt-4 text-sm text-ink/70">
-            {cursosArchivados.length > 0
-              ? "No tienes cursos activos."
-              : "Todavía no has creado ningún curso."}
-          </p>
-        ) : (
-          <ListaCursos cursos={cursosActivos} />
-        )}
-
-        {cursosArchivados.length > 0 && (
-          <details className="mt-8">
-            <summary className="link-muted cursor-pointer">
-              Cursos archivados ({cursosArchivados.length})
-            </summary>
+      {cursosArchivados.length > 0 && (
+        <details className="text-ink/75">
+          <summary className="flex min-h-11 cursor-pointer items-center">
+            Cursos archivados ({cursosArchivados.length})
+          </summary>
+          <div className="mt-4">
             <ListaCursos cursos={cursosArchivados} />
-          </details>
-        )}
-      </section>
+          </div>
+        </details>
+      )}
     </main>
   );
 }
 
-function ListaCursos({
-  cursos,
-}: {
-  cursos: {
-    id: string;
-    nombre: string;
-    grupo: string;
-    periodo: string;
-    clave_acceso: string;
-    inscripciones: { count: number }[];
-  }[];
-}) {
+function ListaCursos({ cursos }: { cursos: CursoTarjeta[] }) {
   return (
-    <ul className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
       {cursos.map((curso) => (
-        <li key={curso.id} className="card p-4 transition-shadow hover:shadow-md">
-          <Link href={`/docente/cursos/${curso.id}`}>
-            <p className="font-medium text-ink">{curso.nombre}</p>
-            <p className="text-sm text-ink/70">
-              {curso.grupo} · {curso.periodo}
-            </p>
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="clave-acceso">{curso.clave_acceso}</span>
-              <span className="text-ink/70">
-                {curso.inscripciones[0]?.count ?? 0} inscritos
-              </span>
-            </div>
-          </Link>
-        </li>
+        <TarjetaCurso key={curso.id} curso={curso} />
       ))}
     </ul>
+  );
+}
+
+// Mismo tamaño para "Calificar n" y "Abrir curso"; solo cambia el color.
+const botonTarjeta =
+  "inline-flex min-h-11 items-center rounded-full border-2 px-5 text-base font-medium transition-colors";
+
+function TarjetaCurso({ curso }: { curso: CursoTarjeta }) {
+  const inscritos = curso.inscripciones[0]?.count ?? 0;
+  const actividades = curso.actividades[0]?.count ?? 0;
+  const pendientes = curso.pendientes;
+  const hayPendientes = (pendientes?.total ?? 0) > 0;
+  const enlaceCurso = `/docente/cursos/${curso.id}`;
+
+  return (
+    <li className="flex min-w-0 flex-col gap-5 rounded-2xl border border-verde-bosque/15 bg-superficie p-6 sm:gap-6 sm:p-7">
+      <div className="flex flex-col gap-1">
+        <Link
+          href={enlaceCurso}
+          className="font-title text-2xl font-semibold leading-snug text-ink hover:text-verde-bosque hover:underline sm:text-[26px]"
+        >
+          {curso.nombre}
+        </Link>
+        <p className="text-base text-ink/75 sm:text-[17px]">
+          {/* Hay grupos escritos como "Grupo I": no repetir la palabra. */}
+          {/^grupo\b/i.test(curso.grupo) ? curso.grupo : `Grupo ${curso.grupo}`}, periodo{" "}
+          {curso.periodo}
+        </p>
+      </div>
+
+      <dl className="grid grid-cols-3 gap-2 sm:flex sm:gap-8">
+        <Dato valor={inscritos} etiqueta="inscritos" />
+        <Dato valor={actividades} etiqueta="actividades" />
+        {pendientes && (
+          <Dato valor={pendientes.total} etiqueta="por calificar" resaltado={hayPendientes} />
+        )}
+      </dl>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-verde-bosque/12 pt-4 sm:pt-5">
+        <span className="inline-flex items-center gap-2 text-sm text-ink/75 sm:text-[15px]">
+          Clave <span className="clave-acceso">{curso.clave_acceso}</span>
+        </span>
+        {hayPendientes && pendientes ? (
+          <Link
+            href={`${enlaceCurso}/${pendientes.tareas > 0 ? "tareas" : "examenes"}`}
+            className={`${botonTarjeta} border-terracota text-terracota hover:bg-terracota/5`}
+          >
+            Calificar {pendientes.total}
+          </Link>
+        ) : (
+          <Link
+            href={enlaceCurso}
+            className={`${botonTarjeta} border-verde-bosque text-verde-bosque hover:bg-verde-bosque/10`}
+          >
+            Abrir curso
+          </Link>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function Dato({
+  valor,
+  etiqueta,
+  resaltado = false,
+}: {
+  valor: number;
+  etiqueta: string;
+  resaltado?: boolean;
+}) {
+  return (
+    <div className="flex flex-col-reverse">
+      <dt className="text-sm text-ink/75 sm:text-[15px]">{etiqueta}</dt>
+      <dd
+        className={`text-[26px] font-semibold leading-tight tabular-nums sm:text-3xl ${resaltado ? "text-terracota" : "text-ink"}`}
+      >
+        {valor}
+      </dd>
+    </div>
   );
 }

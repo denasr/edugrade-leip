@@ -47,7 +47,7 @@ export default function FormularioCurso() {
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="btn-primary w-full max-w-sm"
+        className="btn-primary min-h-13 w-full px-7 text-[17px] sm:w-auto"
       >
         + Nuevo curso
       </button>
