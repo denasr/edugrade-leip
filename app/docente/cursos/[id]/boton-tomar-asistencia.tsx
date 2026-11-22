@@ -12,14 +12,25 @@ function fechaLocalHoy(): string {
   return `${hoy.getFullYear()}-${pad(hoy.getMonth() + 1)}-${pad(hoy.getDate())}`;
 }
 
-export default function BotonTomarAsistencia({ cursoId }: { cursoId: string }) {
+export default function BotonTomarAsistencia({
+  cursoId,
+  variante = "normal",
+}: {
+  cursoId: string;
+  // "franja": botón crema sobre la franja verde del encabezado del curso.
+  variante?: "normal" | "franja";
+}) {
   const router = useRouter();
 
   return (
     <button
       type="button"
       onClick={() => router.push(`/docente/cursos/${cursoId}/asistencia/${fechaLocalHoy()}`)}
-      className="btn-primary w-full max-w-sm"
+      className={
+        variante === "franja"
+          ? "inline-flex min-h-11 items-center justify-center rounded-full bg-crema px-5 py-2.5 text-sm font-semibold text-verde-bosque transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crema"
+          : "btn-primary w-full max-w-sm"
+      }
     >
       Tomar asistencia de hoy
     </button>

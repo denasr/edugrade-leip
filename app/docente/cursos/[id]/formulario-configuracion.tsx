@@ -18,9 +18,11 @@ const estadoInicial: EstadoConfiguracion = { error: null };
 export default function FormularioConfiguracion({
   cursoId,
   porcentajes,
+  textoBoton = "⚙ Configuración de ponderación",
 }: {
   cursoId: string;
   porcentajes: Porcentajes;
+  textoBoton?: string;
 }) {
   const { mostrar } = useToast();
   const [abierto, setAbierto] = useState(false);
@@ -68,7 +70,7 @@ export default function FormularioConfiguracion({
         onClick={() => setAbierto(true)}
         className="link-muted w-full max-w-sm justify-center"
       >
-        ⚙ Configuración de ponderación
+        {textoBoton}
       </button>
     );
   }
