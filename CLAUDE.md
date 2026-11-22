@@ -356,7 +356,7 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `tests/e2e/fixtures/prueba.docx`, generado con `jszip`.
 - **Archivar cursos.** Columna `cursos.archivado_at` (migración `20261101120000`; `null` =
   activo). Es solo organización del docente:
-  - el curso sale de "Mis cursos" y de "Por calificar" en `/docente` y pasa a una sección
+  - el curso sale de la lista principal de `/docente` y del conteo de entregas por calificar, y pasa a una sección
     plegada "Cursos archivados" (`<details>`);
   - sigue completo y editable;
   - se archiva y desarchiva con un botón en el Resumen del curso
@@ -468,6 +468,15 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   corre `finalizarIntentosVencidos`). Quien se inscribió después del cierre sigue
   contando como faltante (el libro también dice "Sin entregar"), pero se marca "Se
   inscribió tras el cierre".
+- **Inicio del docente con tarjetas por curso.** `/docente` (22-nov-2026, a partir de una
+  maqueta aprobada por el docente): título "Tus cursos" con una línea de resumen ("Tienes n
+  entregas por calificar en m cursos") y el botón "+ Nuevo curso". Una tarjeta por curso
+  activo con nombre, grupo y periodo, tres datos grandes (inscritos, actividades, por
+  calificar) y abajo la clave de acceso más un botón: "Calificar n" (terracota, lleva a la
+  pestaña Tareas o Exámenes) si hay pendientes, o "Abrir curso". Antes había dos secciones
+  que repetían los cursos ("Por calificar" y "Mis cursos"); se unieron. El conteo sigue
+  saliendo de `contarPendientesCurso`. Terracota solo para lo pendiente. El saludo con el
+  nombre se quitó porque el encabezado ya lo muestra.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
