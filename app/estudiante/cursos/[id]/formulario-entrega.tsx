@@ -63,6 +63,57 @@ function mensajeErrorSubida(mensaje: string, nombreArchivo: string): string {
   return `Se cortó la conexión mientras se subía "${nombreArchivo}". Mantén la pantalla encendida y, si puedes, conéctate a Wi-Fi e intenta de nuevo.`;
 }
 
+// Cuánto se espera a que una foto se reduzca antes de darse por vencido y
+// subir la original. En un celular con poca memoria, decodificar una foto
+// grande puede quedarse colgado sin fallar, y la pantalla se quedaba en
+// "Preparando archivos…" sin salida.
+const LIMITE_REDUCIR_FOTO_MS = 20_000;
+
+type Rechazo = {
+  mensaje: string;
+  motivo: "sin-archivos" | "demasiados-archivos" | "formato" | "tamano" | "tamano-total";
+};
+
+// Solo extensión y tamaño de cada archivo, nunca su nombre: puede traer el
+// nombre del estudiante o del contenido.
+function describirArchivos(archivos: File[]) {
+  return archivos.map((a) => ({
+    extension: a.name.includes(".") ? a.name.split(".").pop()?.toLowerCase() : "(sin extensión)",
+    tamanoBytes: a.size,
+  }));
+}
+
+// Lo que el formulario frena antes de subir nada (formato, tamaño, la tarea
+// ya cerró…) se le muestra al estudiante, pero antes no quedaba en ningún
+// lado: en Sentry y en los registros de Supabase todo se veía limpio
+// mientras los estudiantes reportaban que no podían entregar (23-nov-2026).
+// Nivel "warning", no "error": son avisos esperados, no fallas de la app.
+function reportarFrenoEntrega(
+  etapa: string,
+  detalle: Record<string, unknown>,
+  archivos: File[]
+) {
+  Sentry.captureMessage(`Entrega de tarea frenada: ${etapa}`, {
+    level: "warning",
+    tags: { flujo: "entrega-tarea", etapa, motivo: String(detalle.motivo ?? "") },
+    extra: { ...detalle, archivos: describirArchivos(archivos) },
+  });
+}
+
+async function reducirConLimite(original: File): Promise<File> {
+  let temporizador: ReturnType<typeof setTimeout> | undefined;
+  const vencido = new Promise<null>((resolve) => {
+    temporizador = setTimeout(() => resolve(null), LIMITE_REDUCIR_FOTO_MS);
+  });
+  const resultado = await Promise.race([comprimirImagen(original), vencido]);
+  clearTimeout(temporizador);
+  if (resultado === null) {
+    reportarFrenoEntrega("reducir-foto-tiempo", { motivo: "tiempo-agotado" }, [original]);
+    return original;
+  }
+  return resultado;
+}
+
 export default function FormularioEntrega({
   actividadId,
   cursoId,
@@ -76,41 +127,80 @@ export default function FormularioEntrega({
   const [progreso, setProgreso] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  function validarArchivos(archivos: File[]): string | null {
+  function validarArchivos(archivos: File[]): Rechazo | null {
     if (archivos.length === 0) {
-      return "Adjunta al menos un archivo para entregar la tarea.";
+      return {
+        mensaje: "Adjunta al menos un archivo para entregar la tarea.",
+        motivo: "sin-archivos",
+      };
     }
     if (archivos.length > MAXIMO_ARCHIVOS) {
-      return `Puedes adjuntar hasta ${MAXIMO_ARCHIVOS} archivos.`;
+      return {
+        mensaje: `Puedes adjuntar hasta ${MAXIMO_ARCHIVOS} archivos.`,
+        motivo: "demasiados-archivos",
+      };
     }
 
     let total = 0;
     for (const archivo of archivos) {
       if (!tipoDeArchivo(archivo)) {
-        return `"${archivo.name}" no es un formato permitido. Usa PDF, DOCX, JPG, PNG o HEIC.`;
+        return {
+          mensaje: `"${archivo.name}" no es un formato permitido. Usa PDF, DOCX, JPG, PNG o HEIC.`,
+          motivo: "formato",
+        };
       }
       if (archivo.size > TAMANO_MAXIMO_BYTES) {
-        return `"${archivo.name}" supera el máximo de 10 MB.`;
+        return {
+          mensaje: `"${archivo.name}" supera el máximo de 10 MB.`,
+          motivo: "tamano",
+        };
       }
       total += archivo.size;
     }
     if (total > TAMANO_MAXIMO_TOTAL_BYTES) {
-      return "El total de archivos supera el máximo de 30 MB entre todos.";
+      return {
+        mensaje: "El total de archivos supera el máximo de 30 MB entre todos.",
+        motivo: "tamano-total",
+      };
     }
     return null;
+  }
+
+  function rechazar(rechazo: Rechazo, archivos: File[]) {
+    reportarFrenoEntrega("validacion", { motivo: rechazo.motivo }, archivos);
+    setError(rechazo.mensaje);
   }
 
   async function manejarEnvio(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (pending) return;
 
+    // Red de seguridad: cualquier excepción no prevista (p. ej. una Server
+    // Action que ya no existe porque se publicó una versión nueva mientras
+    // la página seguía abierta) dejaba el botón en "Entregando…" para
+    // siempre, sin mensaje.
+    try {
+      await entregar();
+    } catch (errorInesperado) {
+      Sentry.captureException(errorInesperado, {
+        tags: { flujo: "entrega-tarea", etapa: "inesperado" },
+      });
+      setError(
+        "Algo falló al entregar tu tarea. Recarga la página e intenta de nuevo; si sigue igual, avísale a tu docente."
+      );
+      setPending(false);
+      setProgreso(null);
+    }
+  }
+
+  async function entregar() {
     const form = formRef.current;
     if (!form) return;
 
     const input = form.elements.namedItem("archivos") as HTMLInputElement | null;
     const originales = Array.from(input?.files ?? []);
     if (originales.length === 0 || originales.length > MAXIMO_ARCHIVOS) {
-      setError(validarArchivos(originales));
+      rechazar(validarArchivos(originales)!, originales);
       return;
     }
 
@@ -128,7 +218,7 @@ export default function FormularioEntrega({
     setProgreso("Preparando archivos…");
     const archivos: File[] = [];
     for (const original of originales) {
-      archivos.push(await comprimirImagen(original));
+      archivos.push(await reducirConLimite(original));
     }
 
     // En Android, un archivo elegido desde WhatsApp, Drive o el gestor de
@@ -164,7 +254,7 @@ export default function FormularioEntrega({
 
     const errorValidacion = validarArchivos(archivos);
     if (errorValidacion) {
-      setError(errorValidacion);
+      rechazar(errorValidacion, archivos);
       setPending(false);
       setProgreso(null);
       return;
@@ -174,6 +264,13 @@ export default function FormularioEntrega({
 
     const resultadoEntrega = await crearEntrega(actividadId, comentario);
     if (resultadoEntrega.error || !resultadoEntrega.entregaId) {
+      // Los mensajes de crearEntrega son fijos ("Ya entregaste esta
+      // tarea.", "Tu sesión expiró…"), sin datos del estudiante.
+      reportarFrenoEntrega(
+        "crear-entrega",
+        { motivo: resultadoEntrega.error ?? "sin-entregaId" },
+        archivos
+      );
       setError(resultadoEntrega.error ?? "No se pudo registrar la entrega.");
       setPending(false);
       setProgreso(null);
@@ -247,6 +344,7 @@ export default function FormularioEntrega({
     setProgreso(null);
 
     if (resultadoFinal.error) {
+      reportarFrenoEntrega("confirmar-archivos", { motivo: resultadoFinal.error }, archivos);
       setError(resultadoFinal.error);
       return;
     }

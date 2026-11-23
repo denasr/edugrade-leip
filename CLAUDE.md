@@ -192,6 +192,19 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   lee cada archivo con `arrayBuffer()` **antes** de `crearEntrega`. Si no puede, le pide al
   estudiante abrir o guardar el archivo y volver a elegirlo, y lo reporta a Sentry
   (`etapa: leer-archivo`). Si sí puede, sube esa copia en memoria.
+- **Rastro de las entregas frenadas antes de subir.** (23-nov-2026) Los estudiantes
+  reportaban que no podían entregar, pero Sentry y los registros de Supabase se veían
+  limpios: todo lo que el formulario frena antes de subir (formato, tamaño, número de
+  archivos, "Ya entregaste esta tarea", sesión expirada) se mostraba en pantalla y no
+  quedaba en ningún lado. Ahora `formulario-entrega.tsx` lo manda a Sentry como
+  `warning` (`flujo: entrega-tarea`, `etapa`: `validacion`, `crear-entrega`,
+  `confirmar-archivos` o `reducir-foto-tiempo`, más `motivo`), con solo la extensión y
+  el tamaño de cada archivo, nunca su nombre. La reducción de cada foto tiene un límite de
+  20 s (`LIMITE_REDUCIR_FOTO_MS`): si se cuelga, se sube la original. Y una excepción no
+  prevista (p. ej. una Server Action que ya no existe tras publicar una versión nueva con
+  la página abierta) ya no deja el botón en "Entregando…": se reporta (`etapa:
+  inesperado`) y se le pide recargar. Los registros de Vercel no sirven para esto: en el
+  plan gratuito duran alrededor de 1 hora.
 - **Fotos reducidas antes de subirse.** `comprimirImagen` (`lib/comprimir-imagen.ts`),
   llamada por `formulario-entrega.tsx` **antes** de validar el tamaño: JPG de más de
   600 KB y PNG de más de 1.5 MB pasan a JPEG de 2000 px de lado mayor y calidad 0.82
