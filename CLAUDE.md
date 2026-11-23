@@ -477,6 +477,19 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   que repetían los cursos ("Por calificar" y "Mis cursos"); se unieron. El conteo sigue
   saliendo de `contarPendientesCurso`. Terracota solo para lo pendiente. El saludo con el
   nombre se quitó porque el encabezado ya lo muestra.
+- **Página del curso del docente (Resumen) y franja del curso.** (22-nov-2026, a partir de
+  una maqueta). `EncabezadoCurso` es ahora una franja verde a todo lo ancho, igual en las
+  7 pestañas: nombre, grupo, periodo, número de inscritos, clave con botón "Copiar",
+  "Tomar asistencia de hoy" y el enlace al libro de calificaciones. El Resumen dejó de ser
+  solo formularios y muestra, en orden: entregas por calificar por actividad (mismo
+  criterio que `contarPendientesCurso`, estado `PENDIENTE`, para que sume lo mismo que la
+  franja de pestañas), "El semestre hasta hoy" (`linea-semestre.tsx`: cada actividad en su
+  fecha de cierre, círculo = tarea, rombo = examen, terracota = por calificar, punteado =
+  oculta; en celular se desplaza sola hasta "Hoy"), próximos cierres con cuántos ya
+  entregaron (`calcularFaltantes`), asistencia de las últimas 8 sesiones (sin
+  justificados, como el % de asistencia) y la ponderación como barra. Duplicar y archivar
+  quedan al final. Los datos salen de `obtenerResumenCursoDocente`
+  (`lib/resumen-curso-docente.ts`), que no calcula ninguna nota.
 - **Sistema de diseño visual.** Paleta propia en `app/globals.css` vía `@theme` de
   Tailwind v4: `crema` (fondo), `verde-bosque` (primario, botones y encabezados),
   `terracota` (acentos y acciones destructivas), más colores de estado (`abierta`,
