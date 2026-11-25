@@ -1,6 +1,12 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { createClient } from "@/lib/supabase/server";
-import { textoNotaParcial } from "@/lib/calificacion-final";
+import {
+  ETIQUETA_PROMEDIO_TOTAL,
+  NOTA_PENDIENTES_CERO,
+  textoAvance,
+  textoCategoriasExcluidas,
+  textoNota,
+} from "@/lib/promedio-total-curso";
 import {
   obtenerResumenCursoEstudiante,
   situacionActividad,
@@ -328,29 +334,31 @@ export async function GET(
 
   // Promedio general
   w.titulo("Promedio general");
+  w.texto(ETIQUETA_PROMEDIO_TOTAL, { tamano: 9, color: TENUE, despues: 2 });
   w.dato(
     "Calificación final",
-    resultadoFinal.calificacionFinal !== null
-      ? `${resultadoFinal.calificacionFinal.toFixed(1)}/10`
-      : "Sin datos suficientes",
+    textoNota(resultadoFinal.calificacionFinal, "Sin datos suficientes"),
     true
   );
   w.dato(
     `Promedio de tareas (${curso.porcentaje_tareas}%)`,
-    resultadoFinal.promedioTareas !== null ? `${resultadoFinal.promedioTareas.toFixed(1)}/10` : "Sin datos"
+    textoNota(resultadoFinal.tareas.promedio)
   );
+  w.texto(textoAvance(resultadoFinal.tareas, "tareas"), { tamano: 8, color: TENUE, despues: 2 });
   w.dato(
     `Promedio de exámenes (${curso.porcentaje_examenes}%)`,
-    resultadoFinal.promedioExamenes !== null ? `${resultadoFinal.promedioExamenes.toFixed(1)}/10` : "Sin datos"
+    textoNota(resultadoFinal.examenes.promedio)
   );
+  w.texto(textoAvance(resultadoFinal.examenes, "exámenes"), { tamano: 8, color: TENUE, despues: 2 });
   w.dato(
     `Asistencia (${curso.porcentaje_asistencia}%)`,
     resultadoFinal.porcentajeAsistencia !== null ? `${resultadoFinal.porcentajeAsistencia.toFixed(0)}%` : "Sin datos"
   );
-  const notaParcial = textoNotaParcial(resultadoFinal.categoriasFaltantes);
-  if (notaParcial) w.texto(notaParcial, { tamano: 9, color: TENUE });
+  w.texto(NOTA_PENDIENTES_CERO, { tamano: 9, color: TENUE });
+  const notaExcluidas = textoCategoriasExcluidas(resultadoFinal.categoriasExcluidas);
+  if (notaExcluidas) w.texto(notaExcluidas, { tamano: 9, color: TENUE });
   w.texto(
-    "Se calcula con lo que ya entregaste y fue calificado, más tu asistencia, según la ponderación del curso. Las actividades sin calificar o sin entregar no cuentan como cero.",
+    `Tareas y exámenes se dividen entre el total del curso (${resultadoFinal.tareas.total} tareas y ${resultadoFinal.examenes.total} exámenes), no solo entre lo ya calificado; las actividades que aún no se publican también cuentan 0. La asistencia es presentes entre presentes más faltas desde tu inscripción; las justificadas no cuentan.`,
     { tamano: 8, color: TENUE }
   );
 
