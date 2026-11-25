@@ -2,7 +2,13 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { estadoActividad } from "@/lib/actividades";
-import { textoNotaParcial } from "@/lib/calificacion-final";
+import {
+  ETIQUETA_PROMEDIO_TOTAL,
+  NOTA_PENDIENTES_CERO,
+  textoAvance,
+  textoCategoriasExcluidas,
+  textoNota,
+} from "@/lib/promedio-total-curso";
 import { obtenerResumenCursoEstudiante } from "@/lib/resumen-curso-estudiante";
 import { ordenarParaEstudiante } from "@/lib/preguntas-examen";
 import { dentroDelTiempo, type IntentoActivo } from "@/lib/intentos-examen";
@@ -174,7 +180,7 @@ export default async function DetalleCursoEstudiante({
     })
   );
 
-  const notaParcial = textoNotaParcial(resultadoFinal.categoriasFaltantes);
+  const notaExcluidas = textoCategoriasExcluidas(resultadoFinal.categoriasExcluidas);
 
   return (
     <main className="flex flex-1 flex-col items-center gap-10 px-4 py-16">
@@ -197,22 +203,26 @@ export default async function DetalleCursoEstudiante({
           Calificación final
         </h2>
 
-        <div className="mt-4 flex flex-col gap-2 text-sm text-ink/80">
-          <div className="flex items-center justify-between">
-            <span>Tareas ({curso.porcentaje_tareas}%)</span>
-            <span>
-              {resultadoFinal.promedioTareas !== null
-                ? `${resultadoFinal.promedioTareas.toFixed(1)}/10`
-                : "Sin datos"}
-            </span>
+        <p className="mt-1 text-xs text-ink/70">{ETIQUETA_PROMEDIO_TOTAL}</p>
+
+        <div className="mt-4 flex flex-col gap-3 text-sm text-ink/80">
+          <div>
+            <div className="flex items-center justify-between">
+              <span>Tareas ({curso.porcentaje_tareas}%)</span>
+              <span>{textoNota(resultadoFinal.tareas.promedio)}</span>
+            </div>
+            <p className="text-xs text-ink/70">
+              {textoAvance(resultadoFinal.tareas, "tareas")}
+            </p>
           </div>
-          <div className="flex items-center justify-between">
-            <span>Exámenes ({curso.porcentaje_examenes}%)</span>
-            <span>
-              {resultadoFinal.promedioExamenes !== null
-                ? `${resultadoFinal.promedioExamenes.toFixed(1)}/10`
-                : "Sin datos"}
-            </span>
+          <div>
+            <div className="flex items-center justify-between">
+              <span>Exámenes ({curso.porcentaje_examenes}%)</span>
+              <span>{textoNota(resultadoFinal.examenes.promedio)}</span>
+            </div>
+            <p className="text-xs text-ink/70">
+              {textoAvance(resultadoFinal.examenes, "exámenes")}
+            </p>
           </div>
           <div className="flex items-center justify-between">
             <span>Asistencia ({curso.porcentaje_asistencia}%)</span>
@@ -226,12 +236,11 @@ export default async function DetalleCursoEstudiante({
 
         <div className="mt-4 border-t border-verde-bosque/15 pt-4">
           <p className="font-title text-2xl text-verde-bosque">
-            {resultadoFinal.calificacionFinal !== null
-              ? `${resultadoFinal.calificacionFinal.toFixed(1)}/10`
-              : "Sin datos suficientes"}
+            {textoNota(resultadoFinal.calificacionFinal, "Sin datos suficientes")}
           </p>
-          {notaParcial && (
-            <p className="mt-1 text-xs text-terracota">{notaParcial}</p>
+          <p className="mt-1 text-xs text-ink/70">{NOTA_PENDIENTES_CERO}</p>
+          {notaExcluidas && (
+            <p className="mt-1 text-xs text-ink/70">{notaExcluidas}</p>
           )}
         </div>
 

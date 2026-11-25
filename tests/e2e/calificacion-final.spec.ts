@@ -19,8 +19,12 @@ import {
 // de romper sin darse cuenta en un refactor, y la más difícil de notar a
 // simple vista (el resultado sigue pareciendo un número razonable).
 //
+// La vista del estudiante promedia sobre el total previsto del curso (5
+// tareas y 5 exámenes, lib/promedio-total-curso.ts): lo que falta cuenta 0.
 // Con tarea=6.0 y examen=5.0 (1 de 2 preguntas correctas, mismos puntos):
-//   final = (6*40 + 5*50) / (40+50) = 490/90 = 5.444... → se muestra "5.4/10"
+//   tareas = 6/5 = 1.2, exámenes = 5/5 = 1.0
+//   final = (1.2*40 + 1.0*50) / (40+50) = 98/90 = 1.0888... → "1.09/10"
+// (El libro del docente sigue con lib/calificacion-final.ts: no cambia.)
 test.describe("Calificación final: redistribución cuando falta una categoría", () => {
   let docente: CuentaPrueba;
   let estudiante: CuentaPrueba;
@@ -131,18 +135,23 @@ test.describe("Calificación final: redistribución cuando falta una categoría"
     await page.reload();
     await expect(
       page.getByText("Tareas (40%)").locator("xpath=..")
-    ).toContainText("6.0/10");
+    ).toContainText("1.20/10");
     await expect(
       page.getByText("Exámenes (50%)").locator("xpath=..")
-    ).toContainText("5.0/10");
+    ).toContainText("1.00/10");
     await expect(
       page.getByText("Asistencia (10%)").locator("xpath=..")
     ).toContainText("Sin datos");
 
-    await expect(page.getByText("5.4/10")).toBeVisible();
+    await expect(page.getByText("1.09/10")).toBeVisible();
+    await expect(page.getByText("1 de 5 tareas calificadas")).toBeVisible();
+    await expect(page.getByText("1 de 5 exámenes calificados")).toBeVisible();
+    await expect(
+      page.getByText("Los pendientes cuentan 0 hasta que se califiquen.")
+    ).toBeVisible();
     await expect(
       page.getByText(
-        "Calificación parcial: aún no se ha tomado asistencia en este curso."
+        "Por ahora la asistencia no cuenta: aún no tienes asistencias ni faltas registradas desde tu inscripción. Su peso se reparte entre tareas y exámenes."
       )
     ).toBeVisible();
   });

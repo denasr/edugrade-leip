@@ -3,11 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { finalizarIntentosVencidos } from "@/lib/intentos-examen";
 import { compararPorCierre, estadoActividad } from "@/lib/actividades";
 import {
-  calcularCalificacionFinal,
-  calcularPorcentajeAsistencia,
-  promedioCalificaciones,
-  type ResultadoCalificacionFinal,
-} from "@/lib/calificacion-final";
+  calcularPromedioSobreTotal,
+  type ResultadoPromedioTotal,
+} from "@/lib/promedio-total-curso";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -86,7 +84,10 @@ export type ResumenCursoEstudiante = {
   tareas: TareaDelEstudiante[];
   examenes: ExamenDelEstudiante[];
   asistencia: { presentes: number; ausentes: number; justificados: number };
-  resultadoFinal: ResultadoCalificacionFinal;
+  // Promedio sobre el total de actividades del curso (ver
+  // lib/promedio-total-curso.ts). Distinto, a propósito, del que muestra el
+  // libro del docente (lib/calificacion-final.ts).
+  resultadoFinal: ResultadoPromedioTotal;
 };
 
 // null si el estudiante no está inscrito en el curso (o el curso no existe).
@@ -245,17 +246,20 @@ export async function obtenerResumenCursoEstudiante(
     }
   }
 
-  // ---- Calificación final (misma fórmula que el libro del docente) ----
-  const promedioTareas = promedioCalificaciones(
-    (entregasTareas ?? []).map((e) => e.evaluaciones?.calificacion_final)
-  );
-  const promedioExamenes = promedioCalificaciones(
-    examenes.map((e) => e.entrega?.evaluaciones?.calificacion_final)
-  );
-  const resultadoFinal = calcularCalificacionFinal(
-    promedioTareas,
-    promedioExamenes,
-    calcularPorcentajeAsistencia(asistencia.presentes, asistencia.ausentes),
+  // ---- Calificación final: sobre el total de actividades del curso ----
+  // Se calcula sobre todas las actividades crudas (no sobre `tareas` /
+  // `examenes`, que incluyen ocultas con entrega): qué actividades forman N
+  // lo decide solo actividadesQueCuentan. Exámenes: el intento más reciente.
+  const resultadoFinal = calcularPromedioSobreTotal(
+    (tareasCrudas ?? []).map((a) => ({
+      visible_estudiantes: a.visible_estudiantes,
+      calificacion: entregaPorTarea.get(a.id)?.evaluaciones?.calificacion_final,
+    })),
+    (examenesCrudos ?? []).map((e) => ({
+      visible_estudiantes: e.visible_estudiantes,
+      calificacion: entregaPorExamen.get(e.id)?.evaluaciones?.calificacion_final,
+    })),
+    asistencia,
     curso
   );
 

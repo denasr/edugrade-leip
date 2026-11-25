@@ -103,6 +103,18 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `promedioCalificaciones`). El promedio de tareas/exámenes de un estudiante (solo entregas
   calificadas, excluye las que no) vive en `promedioCalificaciones` — la usan tanto la vista
   del estudiante como el libro de calificaciones del docente, para no duplicar la lógica.
+- **Promedio del estudiante sobre el total de actividades** (25-nov-2026, decisión del
+  docente). Solo `/estudiante/cursos/[id]` y su PDF: tareas = suma de calificaciones /
+  N_tareas, exámenes = suma / N_exámenes (intento más reciente), con lo no entregado, sin
+  calificar o aún no creado contando 0. `N = max(5, actividades visibles)`
+  (`TOTAL_TAREAS_PREVISTAS`, `TOTAL_EXAMENES_PREVISTOS` y `totalActividadesCurso` en
+  `lib/promedio-total-curso.ts`, el único lugar que decide N). Las actividades ocultas no
+  suman ni dividen. Asistencia igual que siempre; si no hay presentes ni ausentes se
+  excluye y el divisor es peso_tareas + peso_exámenes. Nota final a 2 decimales. **El
+  libro del docente, su Excel y el resumen del grupo siguen con `lib/calificacion-final.ts`
+  (promedio solo de lo calificado), así que pueden dar un número distinto al del
+  estudiante.** Lo de abajo sobre "la misma fórmula que la vista del estudiante" ya solo
+  aplica al % de asistencia.
 - **Libro de calificaciones del docente.** `/docente/cursos/[id]/calificaciones`, enlazada
   desde `/docente/cursos/[id]`. Una fila por estudiante inscrito, una columna por tarea
   (nota, "Sin calificar" si hay entrega sin evaluar, "Sin entregar" si no hay entrega), una

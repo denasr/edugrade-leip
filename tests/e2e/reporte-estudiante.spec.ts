@@ -107,8 +107,10 @@ test.describe("Reporte de desempeño del estudiante (PDF)", () => {
     await page.goto(`/estudiante/cursos/${cursoId}`);
     await page.waitForLoadState("networkidle");
 
-    // Promedio en pantalla: (8×40 + 6×50 + 6.67×10) / 100 = 6.87 → 6.9.
-    await expect(page.getByText("6.9/10")).toBeVisible();
+    // Promedio sobre el total del curso (5 tareas y 5 exámenes previstos):
+    // tareas 8/5 = 1.6, exámenes 6/5 = 1.2, asistencia 2/3 = 66.67%.
+    // (1.6×40 + 1.2×50 + 6.667×10) / 100 = 1.9067 → 1.91.
+    await expect(page.getByText("1.91/10")).toBeVisible();
 
     const [descarga] = await Promise.all([
       page.waitForEvent("download"),
@@ -125,9 +127,13 @@ test.describe("Reporte de desempeño del estudiante (PDF)", () => {
     expect(t).toContain("E2E reporte-est");
 
     // Promedio general: el mismo número que en pantalla.
-    expect(t).toMatch(/Calificación final 6\.9\/10/);
-    expect(t).toMatch(/Promedio de tareas \(40%\) 8\.0\/10/);
-    expect(t).toMatch(/Promedio de exámenes \(50%\) 6\.0\/10/);
+    expect(t).toMatch(/Calificación final 1\.91\/10/);
+    expect(t).toMatch(/Promedio de tareas \(40%\) 1\.60\/10/);
+    expect(t).toContain("1 de 5 tareas calificadas");
+    expect(t).toMatch(/Promedio de exámenes \(50%\) 1\.20\/10/);
+    expect(t).toContain("1 de 5 exámenes calificados");
+    expect(t).toContain("Promedio sobre el total de actividades del curso");
+    expect(t).toContain("Los pendientes cuentan 0 hasta que se califiquen.");
     expect(t).toMatch(/Asistencia \(10%\) 67%/);
 
     // Asistencia
