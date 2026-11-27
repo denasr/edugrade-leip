@@ -424,6 +424,34 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   responde "Clave de acceso inválida" en cuanto se guarda la nueva. No toca `inscripciones`:
   los ya inscritos siguen igual. No se guarda historial de claves anteriores. Prueba e2e en
   `tests/e2e/cambiar-clave-curso.spec.ts`.
+- **Cerrar y reabrir las inscripciones de un curso.** Complementa "Cambiar la clave de
+  acceso": cambiar la clave reemplaza la llave; cerrar inscripciones cierra la puerta aunque
+  alguien tenga la clave vigente. Columna `cursos.inscripciones_cerradas` (boolean, not null,
+  default false; migración `20261127120000`). **Aplicar esa migración a la base de producción
+  es requisito para que el botón funcione**: sin ella, las páginas cargan normal (ven todo como
+  abierto) y el botón responde con `MENSAJE_FALTA_MIGRACION` en vez de fallar.
+  - Botón "Cerrar inscripciones" / "Abrir inscripciones" en el Resumen del curso (sección "Al
+    terminar el semestre", `boton-inscripciones-curso.tsx`). Cerrar pide `confirm()`
+    (`CONFIRMAR_CERRAR_INSCRIPCIONES`); reabrir no.
+  - `cerrarInscripciones` / `abrirInscripciones` (`app/docente/cursos/[id]/actions.ts`)
+    verifican sesión, rol `DOCENTE` y que el curso sea suyo antes del update, mismo patrón y
+    mismo motivo que `cambiarClaveAcceso`.
+  - `inscribirse_a_curso` hace `raise exception 'Las inscripciones de este curso están
+    cerradas'`. Orden de los chequeos: rol, clave, archivado, ya inscrito, cerradas. El de
+    cerradas va después de "Ya estás inscrito" a propósito, para que un inscrito que vuelve a
+    teclear la clave no crea que lo sacaron. El formulario del estudiante muestra el mensaje
+    tal cual, como los demás errores del RPC.
+  - Indicador "Inscripciones cerradas" junto a la clave en la franja verde del curso (las 7
+    pestañas) y en la tarjeta del curso en `/docente`.
+  - La columna se lee **aparte** del select principal de cada página
+    (`leerCursosConInscripcionesCerradas`, `lib/inscripciones-curso.ts`): si fuera en el mismo
+    select y faltara la migración, la consulta entera fallaría y el docente no podría abrir su
+    curso.
+  - No toca inscripciones, entregas, asistencia ni calificaciones; el docente sigue usando el
+    curso igual. Es independiente de archivar (un curso archivado ya rechaza inscripciones por
+    su lado) y de la clave (cambiarla no reabre ni cierra nada).
+  - Pruebas: `tests/unit/inscripciones-curso.test.ts` y
+    `tests/e2e/inscripciones-cerradas.spec.ts`.
 - **Tipos de pregunta y orden aleatorio (exámenes y cuestionarios).** Reglas en
   `lib/preguntas-examen.ts` (`validarPreguntas`, compartida por `crearExamen` y
   `editarExamen`):
@@ -592,6 +620,7 @@ create table cursos (
   porcentaje_examenes integer not null default 50,
   porcentaje_asistencia integer not null default 10,
   archivado_at timestamptz, -- null = activo (migración 20261101120000)
+  inscripciones_cerradas boolean not null default false, -- migración 20261127120000
   created_at timestamptz default now()
 );
 

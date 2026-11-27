@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { contarPendientesCurso } from "@/lib/pendientes-docente";
 import FormularioCurso from "./formulario-curso";
+import { leerCursosConInscripcionesCerradas } from "@/lib/inscripciones-curso";
 
 type CursoTarjeta = {
   id: string;
@@ -14,6 +15,7 @@ type CursoTarjeta = {
   actividades: { count: number }[];
   // Solo en cursos activos: los archivados no cuentan para "por calificar".
   pendientes?: { tareas: number; examenes: number; total: number };
+  inscripcionesCerradas?: boolean;
 };
 
 export default async function PanelDocente() {
@@ -42,7 +44,14 @@ export default async function PanelDocente() {
 
   // Los archivados salen de la lista principal y del conteo de pendientes;
   // se ven aparte, plegados, al final del panel.
-  const cursosArchivados = (cursos ?? []).filter((c) => c.archivado_at);
+  // Aparte del select de arriba: ver leerCursosConInscripcionesCerradas.
+  const conInscripcionesCerradas = await leerCursosConInscripcionesCerradas(
+    supabase,
+    (cursos ?? []).map((c) => c.id)
+  );
+  const cursosArchivados: CursoTarjeta[] = (cursos ?? [])
+    .filter((c) => c.archivado_at)
+    .map((c) => ({ ...c, inscripcionesCerradas: conInscripcionesCerradas.has(c.id) }));
 
   // Mismo conteo que el número de la franja de pestañas dentro de cada curso
   // (contarPendientesCurso, en lib/pendientes-docente.ts), corrido para todos
@@ -53,7 +62,11 @@ export default async function PanelDocente() {
       .filter((c) => !c.archivado_at)
       .map(async (curso) => {
         const { tareas, examenes } = await contarPendientesCurso(supabase, curso.id);
-        return { ...curso, pendientes: { tareas, examenes, total: tareas + examenes } };
+        return {
+          ...curso,
+          pendientes: { tareas, examenes, total: tareas + examenes },
+          inscripcionesCerradas: conInscripcionesCerradas.has(curso.id),
+        };
       })
   );
 
@@ -153,8 +166,11 @@ function TarjetaCurso({ curso }: { curso: CursoTarjeta }) {
       </dl>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-verde-bosque/12 pt-4 sm:pt-5">
-        <span className="inline-flex items-center gap-2 text-sm text-ink/75 sm:text-[15px]">
+        <span className="inline-flex flex-wrap items-center gap-2 text-sm text-ink/75 sm:text-[15px]">
           Clave <span className="clave-acceso">{curso.clave_acceso}</span>
+          {curso.inscripcionesCerradas && (
+            <span className="text-ink/75">· Inscripciones cerradas</span>
+          )}
         </span>
         {hayPendientes && pendientes ? (
           <Link
