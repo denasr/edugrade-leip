@@ -174,8 +174,9 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   inscrito — no fallaba ni avisaba, el formulario se quedaba sin ningún mensaje. Desde la
   migración `20260828130000` verifica la inscripción existente antes del insert y hace
   `raise exception 'Ya estás inscrito en este curso'`, mismo mecanismo que ya usaba "Clave
-  de acceso inválida". `clave_acceso` es única por curso y no expira ni rota — no hay
-  ninguna lógica de vencimiento en el esquema.
+  de acceso inválida". `clave_acceso` es única por curso y no expira sola — no hay
+  ninguna lógica de vencimiento en el esquema; solo cambia cuando el docente la renueva
+  (ver "Cambiar la clave de acceso de un curso").
 - **Entregas a medias no bloquean al estudiante.** Una tarea se entrega en tres pasos:
   `crearEntrega` (fila en `entregas`), subida directa del navegador a Storage, y
   `confirmarArchivosEntrega` (filas en `archivos_entrega`). Si la subida se interrumpe
@@ -408,6 +409,21 @@ en el navegador). Al construir la versión real, estas son las diferencias delib
   `lib/duplicar-actividad.ts` (`duplicarActividad`), compartida con "Copiar a otro curso"
   (`copiarActividad`). La clave de acceso se genera con `lib/clave-acceso.ts`,
   compartido con `FormularioCurso`.
+- **Cambiar la clave de acceso de un curso.** Botón "Cambiar clave de acceso" en el Resumen
+  del curso (`/docente/cursos/[id]`, sección "Al terminar el semestre", junto a duplicar y
+  archivar), para renovarla p. ej. tras limpiar el grupo al terminar el ciclo. Pide
+  `confirm()` avisando que la clave actual dejará de funcionar para inscripciones nuevas.
+  `cambiarClaveAcceso` (`app/docente/cursos/[id]/actions.ts`) verifica sesión, rol
+  `DOCENTE` y que el curso sea suyo antes del update (un update que RLS filtra no da error,
+  y sin esa verificación respondería "éxito" sin haber guardado nada), genera la clave con
+  `lib/clave-acceso.ts` y la guarda; si choca con la `unique` de `clave_acceso` (23505)
+  reintenta con otra, hasta 5 veces. La clave nueva se muestra junto al botón con "Copiar"
+  y queda en la franja verde del curso y en la tarjeta de `/docente` (se revalidan). No hizo
+  falta migración: `cursos_update_docente` ya permite al dueño actualizar su curso. Tampoco
+  se tocó `inscribirse_a_curso`: busca el curso por la clave vigente, así que la anterior
+  responde "Clave de acceso inválida" en cuanto se guarda la nueva. No toca `inscripciones`:
+  los ya inscritos siguen igual. No se guarda historial de claves anteriores. Prueba e2e en
+  `tests/e2e/cambiar-clave-curso.spec.ts`.
 - **Tipos de pregunta y orden aleatorio (exámenes y cuestionarios).** Reglas en
   `lib/preguntas-examen.ts` (`validarPreguntas`, compartida por `crearExamen` y
   `editarExamen`):
