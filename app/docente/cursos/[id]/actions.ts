@@ -8,6 +8,7 @@ import { duplicarActividad, type ActividadOrigen } from "@/lib/duplicar-activida
 import { duplicarRecursosCurso } from "@/lib/duplicar-recursos";
 import { BUCKET_RECURSOS } from "@/lib/recursos";
 import { validarPreguntas } from "@/lib/preguntas-examen";
+import { generarClaveAcceso } from "@/lib/clave-acceso";
 
 export type EstadoActividad = { error: string | null };
 export type EstadoConfiguracion = { error: string | null };
@@ -904,6 +905,74 @@ export async function cambiarArchivadoCurso(
 
   revalidatePath("/docente");
   revalidarPestanasCurso(cursoId);
+}
+
+export type EstadoCambiarClave = { error: string | null; claveNueva?: string };
+
+// Renueva la clave de acceso de un curso: la anterior deja de servir para
+// inscripciones nuevas en cuanto se guarda (inscribirse_a_curso busca el curso
+// por la clave vigente). No toca inscripciones: quien ya está inscrito sigue
+// igual.
+export async function cambiarClaveAcceso(cursoId: string): Promise<EstadoCambiarClave> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("rol")
+    .eq("id", user.id)
+    .single();
+
+  if (perfil?.rol !== "DOCENTE") {
+    return { error: "Solo el docente del curso puede cambiar su clave." };
+  }
+
+  // RLS (cursos_update_docente) ya restringe el update al dueño, pero un
+  // update que no toca ninguna fila no da error: sin esta verificación, un
+  // curso ajeno respondería "éxito" con una clave que nunca se guardó.
+  const { data: curso } = await supabase
+    .from("cursos")
+    .select("id, clave_acceso")
+    .eq("id", cursoId)
+    .eq("docente_id", user.id)
+    .single();
+
+  if (!curso) {
+    return { error: "No tienes permiso sobre este curso." };
+  }
+
+  // clave_acceso es unique: con 31^6 combinaciones un choque es muy raro, pero
+  // si pasa se reintenta con otra en vez de mostrarle un error al docente.
+  for (let intento = 0; intento < 5; intento++) {
+    const claveNueva = generarClaveAcceso();
+    if (claveNueva === curso.clave_acceso) continue;
+
+    const { data: actualizado, error } = await supabase
+      .from("cursos")
+      .update({ clave_acceso: claveNueva })
+      .eq("id", cursoId)
+      .eq("docente_id", user.id)
+      .select("clave_acceso")
+      .single();
+
+    if (error?.code === "23505") continue;
+    if (error || !actualizado) {
+      return { error: error?.message ?? "No se pudo cambiar la clave." };
+    }
+
+    revalidatePath("/docente");
+    revalidarPestanasCurso(cursoId);
+    revalidatePath(`/docente/cursos/${cursoId}/recursos`);
+    return { error: null, claveNueva: actualizado.clave_acceso };
+  }
+
+  return { error: "No se pudo generar una clave nueva. Inténtalo de nuevo." };
 }
 
 export type EstadoDuplicarCurso = { error: string | null; nuevoCursoId?: string };

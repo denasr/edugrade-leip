@@ -9,6 +9,7 @@ import FranjaPestanas from "./franja-pestanas";
 import FormularioConfiguracion from "./formulario-configuracion";
 import FormularioDuplicarCurso from "./formulario-duplicar-curso";
 import BotonArchivarCurso from "./boton-archivar-curso";
+import BotonCambiarClave from "./boton-cambiar-clave";
 import LineaSemestre from "./linea-semestre";
 
 const ZONA = "America/Mexico_City";
@@ -333,7 +334,8 @@ export default async function ResumenCurso({
           </h2>
           <p className="text-sm text-ink/70">
             {plural(resumen.actividades.length, "actividad", "actividades")} en este curso.
-            Duplícalo para otro grupo o archívalo cuando termine.
+            Duplícalo para otro grupo, archívalo cuando termine o cambia su clave de acceso
+            para que la actual ya no sirva para inscribirse.
           </p>
           <div className="-ml-1 flex flex-col items-start [&_button]:w-auto [&_button]:justify-start">
             <FormularioDuplicarCurso
@@ -342,6 +344,7 @@ export default async function ResumenCurso({
               totalActividades={resumen.actividades.length}
             />
             <BotonArchivarCurso cursoId={curso.id} archivado={curso.archivado_at !== null} />
+            <BotonCambiarClave cursoId={curso.id} />
           </div>
         </section>
       </div>
