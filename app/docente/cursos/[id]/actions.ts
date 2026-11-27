@@ -9,6 +9,10 @@ import { duplicarRecursosCurso } from "@/lib/duplicar-recursos";
 import { BUCKET_RECURSOS } from "@/lib/recursos";
 import { validarPreguntas } from "@/lib/preguntas-examen";
 import { generarClaveAcceso } from "@/lib/clave-acceso";
+import {
+  esColumnaInscripcionesFaltante,
+  MENSAJE_FALTA_MIGRACION,
+} from "@/lib/inscripciones-curso";
 
 export type EstadoActividad = { error: string | null };
 export type EstadoConfiguracion = { error: string | null };
@@ -973,6 +977,77 @@ export async function cambiarClaveAcceso(cursoId: string): Promise<EstadoCambiar
   }
 
   return { error: "No se pudo generar una clave nueva. Inténtalo de nuevo." };
+}
+
+export type EstadoInscripcionesCurso = { error: string | null };
+
+// Cerrar inscripciones: nadie nuevo puede inscribirse aunque tenga la clave
+// vigente (lo rechaza inscribirse_a_curso, migración 20261127120000). No toca
+// inscripciones, entregas, asistencia ni calificaciones; el curso se sigue
+// usando igual.
+export async function cerrarInscripciones(cursoId: string): Promise<EstadoInscripcionesCurso> {
+  return cambiarInscripcionesCerradas(cursoId, true);
+}
+
+export async function abrirInscripciones(cursoId: string): Promise<EstadoInscripcionesCurso> {
+  return cambiarInscripcionesCerradas(cursoId, false);
+}
+
+async function cambiarInscripcionesCerradas(
+  cursoId: string,
+  cerradas: boolean
+): Promise<EstadoInscripcionesCurso> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Tu sesión expiró. Vuelve a iniciar sesión." };
+  }
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("rol")
+    .eq("id", user.id)
+    .single();
+
+  if (perfil?.rol !== "DOCENTE") {
+    return { error: "Solo el docente del curso puede cambiar sus inscripciones." };
+  }
+
+  // Mismo motivo que en cambiarClaveAcceso: un update que RLS filtra no da
+  // error, y sin esta verificación un curso ajeno respondería "éxito".
+  const { data: curso } = await supabase
+    .from("cursos")
+    .select("id")
+    .eq("id", cursoId)
+    .eq("docente_id", user.id)
+    .single();
+
+  if (!curso) {
+    return { error: "No tienes permiso sobre este curso." };
+  }
+
+  const { data: actualizado, error } = await supabase
+    .from("cursos")
+    .update({ inscripciones_cerradas: cerradas })
+    .eq("id", cursoId)
+    .eq("docente_id", user.id)
+    .select("inscripciones_cerradas")
+    .single();
+
+  if (esColumnaInscripcionesFaltante(error)) {
+    return { error: MENSAJE_FALTA_MIGRACION };
+  }
+  if (error || !actualizado) {
+    return { error: error?.message ?? "No se pudo guardar el cambio." };
+  }
+
+  revalidatePath("/docente");
+  revalidarPestanasCurso(cursoId);
+  revalidatePath(`/docente/cursos/${cursoId}/recursos`);
+  return { error: null };
 }
 
 export type EstadoDuplicarCurso = { error: string | null; nuevoCursoId?: string };

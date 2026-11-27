@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import BotonTomarAsistencia from "./boton-tomar-asistencia";
 import BotonCopiarClave from "./boton-copiar-clave";
+import { leerCursosConInscripcionesCerradas } from "@/lib/inscripciones-curso";
 
 // Franja verde a todo lo ancho, igual en las 7 pestañas del curso: deja claro
 // en qué curso estás y tiene a la mano lo que se usa en cada clase (la clave
@@ -16,10 +17,14 @@ export default async function EncabezadoCurso({
   curso: { id: string; nombre: string; grupo: string; periodo: string; clave_acceso: string };
 }) {
   const supabase = await createClient();
-  const { count: inscritos } = await supabase
-    .from("inscripciones")
-    .select("id", { count: "exact", head: true })
-    .eq("curso_id", curso.id);
+  const [{ count: inscritos }, conInscripcionesCerradas] = await Promise.all([
+    supabase
+      .from("inscripciones")
+      .select("id", { count: "exact", head: true })
+      .eq("curso_id", curso.id),
+    leerCursosConInscripcionesCerradas(supabase, [curso.id]),
+  ]);
+  const inscripcionesCerradas = conInscripcionesCerradas.has(curso.id);
   const totalInscritos = inscritos ?? 0;
 
   return (
@@ -41,10 +46,19 @@ export default async function EncabezadoCurso({
               ? "1 estudiante inscrito."
               : `${totalInscritos} estudiantes inscritos.`}
           </p>
-          <div className="mt-1 flex w-fit items-center gap-1 rounded-full bg-crema/12 py-0.5 pl-4">
-            <span className="text-sm text-crema/85">Clave</span>
-            <span className="ml-1 font-mono text-base tracking-wider">{curso.clave_acceso}</span>
-            <BotonCopiarClave clave={curso.clave_acceso} />
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex w-fit items-center gap-1 rounded-full bg-crema/12 py-0.5 pl-4">
+              <span className="text-sm text-crema/85">Clave</span>
+              <span className="ml-1 font-mono text-base tracking-wider">{curso.clave_acceso}</span>
+              <BotonCopiarClave clave={curso.clave_acceso} />
+            </div>
+            {/* Junto a la clave: con las inscripciones cerradas, la clave ya
+                no sirve para inscribirse aunque se comparta. */}
+            {inscripcionesCerradas && (
+              <span className="rounded-full border border-crema/40 px-3 py-1 text-sm text-crema">
+                Inscripciones cerradas
+              </span>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:flex-col lg:items-end">
